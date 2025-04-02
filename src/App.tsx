@@ -14,40 +14,43 @@ import AppLayout from "./components/layout/AppLayout";
 import { FlowDataProvider } from "./context/FlowDataContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
-        <FlowDataProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              
-              <Route element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/trends" element={<TrendsPage />} />
-                <Route path="/reports" element={<ReportsPage />} />
-                <Route path="/configuration" element={
-                  <ProtectedRoute requireAdmin={true}>
-                    <ConfigurationPage />
+      <ThemeProvider attribute="class">
+        <AuthProvider>
+          <FlowDataProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                
+                <Route element={
+                  <ProtectedRoute>
+                    <AppLayout />
                   </ProtectedRoute>
-                } />
-              </Route>
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </FlowDataProvider>
-      </AuthProvider>
+                }>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/trends" element={<TrendsPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/configuration" element={
+                    <ProtectedRoute requireAdmin={true}>
+                      <ConfigurationPage />
+                    </ProtectedRoute>
+                  } />
+                </Route>
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </FlowDataProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

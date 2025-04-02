@@ -3,7 +3,7 @@ import React from "react";
 import { Outlet } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
-import { Header } from "./Header";
+import Header from "./Header"; // Fixed import to use default export
 
 const AppLayout: React.FC = () => {
   return (
