@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/use-toast";
 
 type UserRole = "admin" | "client" | null;
 
@@ -16,7 +16,6 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<UserRole>(null);
-  const { toast } = useToast();
 
   // Check for existing session on startup
   useEffect(() => {
