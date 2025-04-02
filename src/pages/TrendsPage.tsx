@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useMemo } from "react";
 import { useFlowData } from "@/context/FlowDataContext";
 import { 
   Card, 
@@ -25,6 +25,17 @@ const TrendsPage: React.FC = () => {
   const effectiveSelectedId = selectedFlowMeterId || (flowMeters.length > 0 ? flowMeters[0].id : null);
   
   const selectedFlowMeter = flowMeters.find(fm => fm.id === effectiveSelectedId);
+  
+  // Transform history data to include a name property for the chart
+  const formattedChartData = useMemo(() => {
+    if (!selectedFlowMeter) return [];
+    
+    return selectedFlowMeter.historyData.map(point => ({
+      ...point,
+      name: point.timestamp.toLocaleString(), // Use the timestamp as the name property
+      value: point.value
+    }));
+  }, [selectedFlowMeter]);
   
   const handleSelectFlowMeter = (value: string) => {
     setSelectedFlowMeterId(parseInt(value));
@@ -78,7 +89,7 @@ const TrendsPage: React.FC = () => {
           </Card>
           
           <ZoomableChart 
-            data={selectedFlowMeter.historyData} 
+            data={formattedChartData} 
             title={`${selectedFlowMeter.name} Trend`}
             lineDataKey="value"
             xAxisLabel="Time"
