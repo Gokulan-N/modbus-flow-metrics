@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useFlowData } from "@/context/FlowDataContext";
 import { 
@@ -186,6 +185,10 @@ const ConfigurationPage: React.FC = () => {
     });
   };
   
+  const handleToggleConnection = (connectionId: number) => {
+    toggleConnection(connectionId);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -231,7 +234,7 @@ const ConfigurationPage: React.FC = () => {
                   <Button
                     variant={connectedIds.includes(connection.id) ? "destructive" : "outline"}
                     size="icon"
-                    onClick={() => toggleConnection(connection.id)}
+                    onClick={() => handleToggleConnection(connection.id)}
                   >
                     <Power className="h-4 w-4" />
                   </Button>

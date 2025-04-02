@@ -1,4 +1,3 @@
-
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { 
@@ -18,7 +17,9 @@ import { useFlowData } from "@/context/FlowDataContext";
 import { cn } from "@/lib/utils";
 
 export const AppSidebar: React.FC = () => {
-  const { isConnected } = useFlowData();
+  const { connectedIds } = useFlowData();
+  
+  const hasActiveConnections = connectedIds.length > 0;
   
   return (
     <Sidebar>
@@ -94,10 +95,10 @@ export const AppSidebar: React.FC = () => {
               <div className="flex items-center gap-2">
                 <div className={cn(
                   "h-3 w-3 rounded-full",
-                  isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+                  hasActiveConnections ? "bg-green-500 animate-pulse" : "bg-red-500"
                 )} />
                 <span className="text-sm">
-                  {isConnected ? "Connected" : "Disconnected"}
+                  {hasActiveConnections ? "Connected" : "Disconnected"}
                 </span>
               </div>
             </div>
