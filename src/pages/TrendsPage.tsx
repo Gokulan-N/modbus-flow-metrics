@@ -78,7 +78,7 @@ const TrendsPage: React.FC = () => {
           </Card>
           
           <ZoomableChart 
-            data={selectedFlowMeter.history} 
+            data={selectedFlowMeter.historyData} 
             title={`${selectedFlowMeter.name} Trend`}
             lineDataKey="value"
             xAxisLabel="Time"
