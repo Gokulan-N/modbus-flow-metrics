@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -97,7 +97,10 @@ const ZoomableChart: React.FC<ZoomableChartProps> = ({
     // Ensure left is before right
     if (leftIndex > rightIndex) {
       [leftIndex, rightIndex] = [rightIndex, leftIndex];
-      [setRefAreaLeft, setRefAreaRight] = [refAreaRight, refAreaLeft];
+      // Fix: Instead of swapping the setState functions (which causes an error),
+      // we'll call them with the swapped values
+      setRefAreaLeft(refAreaRight);
+      setRefAreaRight(refAreaLeft);
     }
     
     // At least 2 points required for zoom

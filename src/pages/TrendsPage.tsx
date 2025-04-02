@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React from "react";
 import { useFlowData } from "@/context/FlowDataContext";
 import { 
   Card, 
@@ -15,7 +15,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ZoomableChart } from "@/components/charts/ZoomableChart";
+import ZoomableChart from "@/components/charts/ZoomableChart";
 import { Badge } from "@/components/ui/badge";
 
 const TrendsPage: React.FC = () => {
@@ -77,7 +77,13 @@ const TrendsPage: React.FC = () => {
             </CardContent>
           </Card>
           
-          <ZoomableChart data={selectedFlowMeter} />
+          <ZoomableChart 
+            data={selectedFlowMeter.history} 
+            title={`${selectedFlowMeter.name} Trend`}
+            lineDataKey="value"
+            xAxisLabel="Time"
+            yAxisLabel={selectedFlowMeter.unit}
+          />
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center p-12 text-center">
