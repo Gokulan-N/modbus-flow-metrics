@@ -48,6 +48,18 @@ export const FlowMeterCard: React.FC<FlowMeterCardProps> = ({
     }
   };
   
+  // Get unit for total flow (converting if needed)
+  const getTotalFlowUnit = () => {
+    // If the flow rate is in L/min, total flow will be in L
+    // If the flow rate is in m³/h, total flow will be in m³
+    if (flowMeter.unit === "L/min") {
+      return "L";
+    } else if (flowMeter.unit === "m³/h") {
+      return "m³";
+    }
+    return flowMeter.unit.replace("/h", "").replace("/min", "");
+  };
+  
   return (
     <Card 
       className={cn(
@@ -76,6 +88,9 @@ export const FlowMeterCard: React.FC<FlowMeterCardProps> = ({
           <div className="flex items-baseline">
             <span className="text-2xl font-bold">{flowMeter.value.toFixed(1)}</span>
             <span className="ml-1 text-sm text-muted-foreground">{flowMeter.unit}</span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Total Flow: <span className="font-medium">{flowMeter.totalFlow.toFixed(1)}</span> {getTotalFlowUnit()}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
             Last update: {flowMeter.lastUpdate.toLocaleTimeString([], { 

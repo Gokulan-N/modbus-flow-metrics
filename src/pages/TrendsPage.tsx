@@ -37,6 +37,20 @@ const TrendsPage: React.FC = () => {
     }));
   }, [selectedFlowMeter]);
   
+  // Get unit for total flow (converting if needed)
+  const getTotalFlowUnit = useMemo(() => {
+    if (!selectedFlowMeter) return "";
+    
+    // If the flow rate is in L/min, total flow will be in L
+    // If the flow rate is in m³/h, total flow will be in m³
+    if (selectedFlowMeter.unit === "L/min") {
+      return "L";
+    } else if (selectedFlowMeter.unit === "m³/h") {
+      return "m³";
+    }
+    return selectedFlowMeter.unit.replace("/h", "").replace("/min", "");
+  }, [selectedFlowMeter]);
+  
   const handleSelectFlowMeter = (value: string) => {
     setSelectedFlowMeterId(parseInt(value));
   };
@@ -66,27 +80,48 @@ const TrendsPage: React.FC = () => {
       
       {selectedFlowMeter ? (
         <div className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-normal">
-                Current Value:
-                <span className="ml-2 font-bold text-xl">
-                  {selectedFlowMeter.value.toFixed(2)} {selectedFlowMeter.unit}
-                </span>
-              </CardTitle>
-              <Badge variant={
-                selectedFlowMeter.status === 'normal' ? 'success' :
-                selectedFlowMeter.status === 'warning' ? 'secondary' : 'destructive'
-              }>
-                {selectedFlowMeter.status.toUpperCase()}
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground">
-                Last updated: {selectedFlowMeter.lastUpdate.toLocaleString()}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base font-normal">
+                  Current Value:
+                  <span className="ml-2 font-bold text-xl">
+                    {selectedFlowMeter.value.toFixed(2)} {selectedFlowMeter.unit}
+                  </span>
+                </CardTitle>
+                <Badge variant={
+                  selectedFlowMeter.status === 'normal' ? 'success' :
+                  selectedFlowMeter.status === 'warning' ? 'secondary' : 'destructive'
+                }>
+                  {selectedFlowMeter.status.toUpperCase()}
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground">
+                  Last updated: {selectedFlowMeter.lastUpdate.toLocaleString()}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base font-normal">
+                  Total Flow:
+                  <span className="ml-2 font-bold text-xl">
+                    {selectedFlowMeter.totalFlow.toFixed(2)} {getTotalFlowUnit}
+                  </span>
+                </CardTitle>
+                <Badge variant="outline">
+                  COMPUTED TAG
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-muted-foreground">
+                  Calculated value based on cumulative flow rates
+                </div>
+              </CardContent>
+            </Card>
+          </div>
           
           <ZoomableChart 
             data={formattedChartData} 

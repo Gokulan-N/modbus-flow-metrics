@@ -8,6 +8,7 @@ export interface FlowMeter {
   status: 'normal' | 'warning' | 'error';
   lastUpdate: Date;
   historyData: HistoryPoint[];
+  totalFlow: number; // Cumulative flow (computed tag)
 }
 
 // History data point

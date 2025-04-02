@@ -84,6 +84,22 @@ export const generateMockFlowMeters = (count: number = 14, startIndex: number = 
       status = 'warning';
     }
     
+    // Calculate initial total flow from history data
+    // Sum up all flow values in history multiplied by the time intervals (in hours)
+    const initialTotalFlow = historyData.reduce((sum, point, index, array) => {
+      if (index === 0) return sum;
+      
+      // Calculate time difference in hours between current and previous point
+      const prevPoint = array[index - 1];
+      const hoursDiff = (point.timestamp.getTime() - prevPoint.timestamp.getTime()) / (1000 * 60 * 60);
+      
+      // Calculate average flow rate between the two points
+      const avgFlow = (point.value + prevPoint.value) / 2;
+      
+      // Add the volume for this time period (flow rate × time)
+      return sum + (avgFlow * hoursDiff);
+    }, 0);
+    
     return {
       id: index + 1,
       name: `Flow Meter ${index + 1}`,
@@ -92,6 +108,7 @@ export const generateMockFlowMeters = (count: number = 14, startIndex: number = 
       status,
       lastUpdate: now,
       historyData,
+      totalFlow: Number(initialTotalFlow.toFixed(2)),
     };
   });
 };
@@ -116,8 +133,20 @@ export const updateMockFlowMeter = (flowMeter: FlowMeter): FlowMeter => {
   // Add the new data point to history
   const updatedHistory = [...flowMeter.historyData];
   
-  // If we have a point at the same minute, replace it instead of adding
+  // Calculate time since last update in hours
   const lastPointTime = updatedHistory[updatedHistory.length - 1]?.timestamp;
+  let hoursSinceLastUpdate = 0;
+  let updateTotalFlow = flowMeter.totalFlow;
+  
+  if (lastPointTime) {
+    hoursSinceLastUpdate = (now.getTime() - lastPointTime.getTime()) / (1000 * 60 * 60);
+    
+    // Calculate the volume of flow since last update (average flow × time)
+    const avgFlow = (lastValue + newValue) / 2;
+    updateTotalFlow += avgFlow * hoursSinceLastUpdate;
+  }
+  
+  // If we have a point at the same minute, replace it instead of adding
   if (lastPointTime && 
       lastPointTime.getMinutes() === now.getMinutes() && 
       lastPointTime.getHours() === now.getHours()) {
@@ -143,5 +172,6 @@ export const updateMockFlowMeter = (flowMeter: FlowMeter): FlowMeter => {
     status,
     lastUpdate: now,
     historyData: updatedHistory,
+    totalFlow: Number(updateTotalFlow.toFixed(2)),
   };
 };
