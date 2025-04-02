@@ -16,11 +16,18 @@ export interface HistoryPoint {
   value: number;
 }
 
-// Modbus configuration type
-export interface ModbusConfig {
+// Modbus connection configuration
+export interface ModbusConnection {
+  id: number;
+  name: string;
   ipAddress: string;
   port: number;
   unitId: number;
+}
+
+// Modbus configuration type
+export interface ModbusConfig {
+  connections: ModbusConnection[];
   flowMeters: FlowMeterConfig[];
 }
 
@@ -28,6 +35,7 @@ export interface ModbusConfig {
 export interface FlowMeterConfig {
   id: number;
   name: string;
+  connectionId: number; // Reference to the Modbus connection
   registerAddress: number;
   registerType: 'holding' | 'input';
   dataType: 'float' | 'int16' | 'int32' | 'uint16' | 'uint32';

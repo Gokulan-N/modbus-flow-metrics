@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { FlowMeter, ModbusConfig } from "../types";
+import { FlowMeter, ModbusConfig, ModbusConnection } from "../types";
 import { 
   defaultModbusConfig, 
   generateMockFlowMeters, 
@@ -12,8 +12,8 @@ interface FlowDataContextProps {
   flowMeters: FlowMeter[];
   modbusConfig: ModbusConfig;
   updateModbusConfig: (config: ModbusConfig) => void;
-  isConnected: boolean;
-  toggleConnection: () => void;
+  connectedIds: number[]; // IDs of connected Modbus connections
+  toggleConnection: (connectionId?: number) => void; // Toggle specific connection
   selectedFlowMeterId: number | null;
   setSelectedFlowMeterId: (id: number | null) => void;
   isLoading: boolean;
@@ -24,7 +24,7 @@ const FlowDataContext = createContext<FlowDataContextProps | undefined>(undefine
 export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [flowMeters, setFlowMeters] = useState<FlowMeter[]>([]);
   const [modbusConfig, setModbusConfig] = useState<ModbusConfig>(defaultModbusConfig);
-  const [isConnected, setIsConnected] = useState(false);
+  const [connectedIds, setConnectedIds] = useState<number[]>([]); // Track connected IDs
   const [selectedFlowMeterId, setSelectedFlowMeterId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -41,21 +41,23 @@ export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     initData();
   }, []);
   
-  // Set up polling for data updates when connected
+  // Set up polling for data updates when any connection is active
   useEffect(() => {
     let interval: number | undefined;
     
-    if (isConnected) {
+    if (connectedIds.length > 0) {
       interval = window.setInterval(() => {
         setFlowMeters(prev => 
-          prev.map(flowMeter => updateMockFlowMeter(flowMeter))
+          prev.map(flowMeter => {
+            // Only update flow meters that belong to connected Modbus instances
+            const flowMeterConfig = modbusConfig.flowMeters.find(fm => fm.id === flowMeter.id);
+            if (flowMeterConfig && connectedIds.includes(flowMeterConfig.connectionId)) {
+              return updateMockFlowMeter(flowMeter);
+            }
+            return flowMeter;
+          })
         );
       }, 5000); // Update every 5 seconds
-      
-      toast({
-        title: "Modbus Connected",
-        description: `Connected to ${modbusConfig.ipAddress}:${modbusConfig.port}`,
-      });
     } else if (interval) {
       clearInterval(interval);
     }
@@ -65,34 +67,81 @@ export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         clearInterval(interval);
       }
     };
-  }, [isConnected, modbusConfig, toast]);
+  }, [connectedIds, modbusConfig]);
   
-  const toggleConnection = () => {
-    if (!isConnected) {
-      // Simulate connection delay
-      setIsLoading(true);
-      setTimeout(() => {
-        setIsConnected(true);
-        setIsLoading(false);
-      }, 1500);
+  const toggleConnection = (connectionId?: number) => {
+    setIsLoading(true);
+    
+    // If no ID provided, toggle all connections
+    if (connectionId === undefined) {
+      // If any are connected, disconnect all
+      if (connectedIds.length > 0) {
+        setConnectedIds([]);
+        toast({
+          title: "All Modbus Disconnected",
+          description: "All connections to Modbus servers have been closed",
+        });
+      } else {
+        // Connect all
+        setTimeout(() => {
+          const allIds = modbusConfig.connections.map(conn => conn.id);
+          setConnectedIds(allIds);
+          toast({
+            title: "All Modbus Connected",
+            description: `Connected to ${modbusConfig.connections.length} Modbus servers`,
+          });
+          setIsLoading(false);
+        }, 1500);
+        return;
+      }
     } else {
-      setIsConnected(false);
-      toast({
-        title: "Modbus Disconnected",
-        description: "Connection to Modbus server has been closed",
-      });
+      // Toggle specific connection
+      setTimeout(() => {
+        if (connectedIds.includes(connectionId)) {
+          // Disconnect
+          setConnectedIds(prev => prev.filter(id => id !== connectionId));
+          
+          const connection = modbusConfig.connections.find(c => c.id === connectionId);
+          if (connection) {
+            toast({
+              title: "Modbus Disconnected",
+              description: `Disconnected from ${connection.name} (${connection.ipAddress}:${connection.port})`,
+            });
+          }
+        } else {
+          // Connect
+          setConnectedIds(prev => [...prev, connectionId]);
+          
+          const connection = modbusConfig.connections.find(c => c.id === connectionId);
+          if (connection) {
+            toast({
+              title: "Modbus Connected",
+              description: `Connected to ${connection.name} (${connection.ipAddress}:${connection.port})`,
+            });
+          }
+        }
+      }, 1500);
     }
+    
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 1500);
   };
   
   const updateModbusConfig = (config: ModbusConfig) => {
     setModbusConfig(config);
     
-    // If connected, disconnect first
-    if (isConnected) {
-      setIsConnected(false);
+    // If any connections are active, disconnect them
+    if (connectedIds.length > 0) {
+      setConnectedIds([]);
       toast({
         title: "Configuration Updated",
-        description: "Modbus connection closed due to configuration change",
+        description: "All Modbus connections closed due to configuration change",
+      });
+    } else {
+      toast({
+        title: "Configuration Updated",
+        description: "Modbus configuration has been updated",
       });
     }
   };
@@ -103,7 +152,7 @@ export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         flowMeters,
         modbusConfig,
         updateModbusConfig,
-        isConnected,
+        connectedIds,
         toggleConnection,
         selectedFlowMeterId,
         setSelectedFlowMeterId,

@@ -1,14 +1,27 @@
-
 import { FlowMeter, HistoryPoint, ModbusConfig } from "../types";
 
 // Initial mock Modbus configuration
 export const defaultModbusConfig: ModbusConfig = {
-  ipAddress: "192.168.1.100",
-  port: 502,
-  unitId: 1,
+  connections: [
+    {
+      id: 1,
+      name: "Main Control Room",
+      ipAddress: "192.168.1.100",
+      port: 502,
+      unitId: 1,
+    },
+    {
+      id: 2,
+      name: "Field Station 1",
+      ipAddress: "192.168.1.101",
+      port: 502,
+      unitId: 2,
+    }
+  ],
   flowMeters: Array.from({ length: 14 }, (_, i) => ({
     id: i + 1,
     name: `Flow Meter ${i + 1}`,
+    connectionId: i < 7 ? 1 : 2, // Distribute meters between the two default connections
     registerAddress: 3000 + i * 2,
     registerType: "holding",
     dataType: "float",
