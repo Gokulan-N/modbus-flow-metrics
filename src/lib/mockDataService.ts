@@ -1,3 +1,4 @@
+
 import { FlowMeter, HistoryPoint, ModbusConfig } from "../types";
 
 // Initial mock Modbus configuration
@@ -68,8 +69,9 @@ export const generateHistoricalData = (hours: number = 24): HistoryPoint[] => {
 };
 
 // Generate mock flow meter data
-export const generateMockFlowMeters = (): FlowMeter[] => {
-  return Array.from({ length: 14 }, (_, i) => {
+export const generateMockFlowMeters = (count: number = 14, startIndex: number = 0): FlowMeter[] => {
+  return Array.from({ length: count }, (_, i) => {
+    const index = startIndex + i;
     const baseValue = 40 + Math.random() * 60;
     const now = new Date();
     const historyData = generateHistoricalData();
@@ -83,10 +85,10 @@ export const generateMockFlowMeters = (): FlowMeter[] => {
     }
     
     return {
-      id: i + 1,
-      name: `Flow Meter ${i + 1}`,
+      id: index + 1,
+      name: `Flow Meter ${index + 1}`,
       value: Number(baseValue.toFixed(2)),
-      unit: i % 2 === 0 ? "m³/h" : "L/min",
+      unit: index % 2 === 0 ? "m³/h" : "L/min",
       status,
       lastUpdate: now,
       historyData,
