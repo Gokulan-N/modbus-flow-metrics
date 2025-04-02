@@ -1,5 +1,5 @@
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useFlowData } from "@/context/FlowDataContext";
 import { 
   Card, 
@@ -17,9 +17,14 @@ import {
 import { Button } from "@/components/ui/button";
 import ZoomableChart from "@/components/charts/ZoomableChart";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+
+type TagType = "flowRate" | "totalFlow";
 
 const TrendsPage: React.FC = () => {
   const { flowMeters, selectedFlowMeterId, setSelectedFlowMeterId } = useFlowData();
+  const [selectedTag, setSelectedTag] = useState<TagType>("flowRate");
   
   // Select first flow meter by default if none is selected
   const effectiveSelectedId = selectedFlowMeterId || (flowMeters.length > 0 ? flowMeters[0].id : null);
@@ -30,29 +35,60 @@ const TrendsPage: React.FC = () => {
   const formattedChartData = useMemo(() => {
     if (!selectedFlowMeter) return [];
     
-    return selectedFlowMeter.historyData.map(point => ({
-      ...point,
-      name: point.timestamp.toLocaleString(), // Use the timestamp as the name property
-      value: point.value
-    }));
-  }, [selectedFlowMeter]);
+    if (selectedTag === "flowRate") {
+      return selectedFlowMeter.historyData.map(point => ({
+        ...point,
+        name: point.timestamp.toLocaleString(), // Use the timestamp as the name property
+        value: point.value
+      }));
+    } else {
+      // For total flow, we need to calculate cumulative values
+      // Let's create a synthetic dataset based on totalFlow value
+      // We'll distribute the total evenly across the time points
+      const dataLength = selectedFlowMeter.historyData.length;
+      if (dataLength === 0) return [];
+      
+      // Get even steps for visualization purposes
+      const step = selectedFlowMeter.totalFlow / dataLength;
+      
+      return selectedFlowMeter.historyData.map((point, index) => ({
+        timestamp: point.timestamp,
+        name: point.timestamp.toLocaleString(),
+        value: step * (index + 1) // Increasing value
+      }));
+    }
+  }, [selectedFlowMeter, selectedTag]);
   
-  // Get unit for total flow (converting if needed)
-  const getTotalFlowUnit = useMemo(() => {
+  // Get unit based on selected tag
+  const getUnitForTag = useMemo(() => {
     if (!selectedFlowMeter) return "";
     
-    // If the flow rate is in L/min, total flow will be in L
-    // If the flow rate is in m³/h, total flow will be in m³
-    if (selectedFlowMeter.unit === "L/min") {
-      return "L";
-    } else if (selectedFlowMeter.unit === "m³/h") {
-      return "m³";
+    if (selectedTag === "flowRate") {
+      return selectedFlowMeter.unit;
+    } else {
+      // Convert unit for total flow
+      if (selectedFlowMeter.unit === "L/min") {
+        return "L";
+      } else if (selectedFlowMeter.unit === "m³/h") {
+        return "m³";
+      }
+      return selectedFlowMeter.unit.replace("/h", "").replace("/min", "");
     }
-    return selectedFlowMeter.unit.replace("/h", "").replace("/min", "");
-  }, [selectedFlowMeter]);
+  }, [selectedFlowMeter, selectedTag]);
   
   const handleSelectFlowMeter = (value: string) => {
     setSelectedFlowMeterId(parseInt(value));
+  };
+  
+  const handleSelectTag = (value: string) => {
+    setSelectedTag(value as TagType);
+  };
+  
+  // Get chart title based on selected tag
+  const getChartTitle = () => {
+    if (!selectedFlowMeter) return "";
+    
+    return `${selectedFlowMeter.name} - ${selectedTag === "flowRate" ? "Flow Rate" : "Total Flow"} Trend`;
   };
   
   return (
@@ -108,7 +144,7 @@ const TrendsPage: React.FC = () => {
                 <CardTitle className="text-base font-normal">
                   Total Flow:
                   <span className="ml-2 font-bold text-xl">
-                    {selectedFlowMeter.totalFlow.toFixed(2)} {getTotalFlowUnit}
+                    {selectedFlowMeter.totalFlow.toFixed(2)} {getUnitForTag}
                   </span>
                 </CardTitle>
                 <Badge variant="outline">
@@ -123,12 +159,34 @@ const TrendsPage: React.FC = () => {
             </Card>
           </div>
           
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Select Tag to Display</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup 
+                value={selectedTag} 
+                onValueChange={handleSelectTag}
+                className="flex space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="flowRate" id="flowRate" />
+                  <Label htmlFor="flowRate">Flow Rate</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="totalFlow" id="totalFlow" />
+                  <Label htmlFor="totalFlow">Total Flow</Label>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+          
           <ZoomableChart 
             data={formattedChartData} 
-            title={`${selectedFlowMeter.name} Trend`}
+            title={getChartTitle()}
             lineDataKey="value"
             xAxisLabel="Time"
-            yAxisLabel={selectedFlowMeter.unit}
+            yAxisLabel={getUnitForTag}
           />
         </div>
       ) : (

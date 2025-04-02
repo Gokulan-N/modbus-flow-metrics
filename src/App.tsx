@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import TrendsPage from "./pages/TrendsPage";
 import ConfigurationPage from "./pages/ConfigurationPage";
 import ReportsPage from "./pages/ReportsPage";
+import AlarmsPage from "./pages/AlarmsPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 import AppLayout from "./components/layout/AppLayout";
@@ -38,6 +39,7 @@ const App = () => (
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/trends" element={<TrendsPage />} />
                   <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/alarms" element={<AlarmsPage />} />
                   <Route path="/configuration" element={
                     <ProtectedRoute requireAdmin={true}>
                       <ConfigurationPage />

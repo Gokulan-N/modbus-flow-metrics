@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { FlowMeter, ModbusConfig, ModbusConnection } from "../types";
 import { 
@@ -16,6 +17,7 @@ interface FlowDataContextProps {
   selectedFlowMeterId: number | null;
   setSelectedFlowMeterId: (id: number | null) => void;
   isLoading: boolean;
+  autoConnectModbus: (isClient?: boolean) => void;
 }
 
 const FlowDataContext = createContext<FlowDataContextProps | undefined>(undefined);
@@ -118,6 +120,23 @@ export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [connectedIds, modbusConfig]);
   
+  // Function to automatically connect Modbus for client users
+  const autoConnectModbus = (isClient = false) => {
+    if (isClient && connectedIds.length === 0) {
+      // Connect all for clients
+      setIsLoading(true);
+      setTimeout(() => {
+        const allIds = modbusConfig.connections.map(conn => conn.id);
+        setConnectedIds(allIds);
+        toast({
+          title: "Auto-Connected to Modbus",
+          description: `Connected to ${modbusConfig.connections.length} Modbus servers for continuous monitoring`,
+        });
+        setIsLoading(false);
+      }, 1500);
+    }
+  };
+  
   const toggleConnection = (connectionId?: number) => {
     setIsLoading(true);
     
@@ -205,7 +224,8 @@ export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         toggleConnection,
         selectedFlowMeterId,
         setSelectedFlowMeterId,
-        isLoading
+        isLoading,
+        autoConnectModbus
       }}
     >
       {children}

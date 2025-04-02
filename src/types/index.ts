@@ -55,3 +55,42 @@ export interface Report {
   status: 'generating' | 'complete' | 'error';
   downloadUrl?: string;
 }
+
+// Alarm configuration type
+export interface AlarmConfig {
+  id: number;
+  flowMeterId: number;
+  name: string;
+  highLimit?: number;
+  lowLimit?: number;
+  deadband: number; // Prevents alarm from oscillating when value is close to the limit
+  enabled: boolean;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  notifyViaEmail: boolean;
+  emailRecipients?: string[];
+}
+
+// Backend API endpoints (for documentation only)
+export interface FlowMeterApiEndpoints {
+  getFlowMeters: '/api/flow-meters';
+  getFlowMeterById: '/api/flow-meters/:id';
+  updateFlowMeter: '/api/flow-meters/:id';
+  getFlowMeterHistory: '/api/flow-meters/:id/history';
+  getFlowMeterAlarms: '/api/flow-meters/:id/alarms';
+  addFlowMeterData: '/api/flow-meters/:id/data';
+}
+
+export interface AlarmApiEndpoints {
+  getAlarms: '/api/alarms';
+  createAlarm: '/api/alarms';
+  updateAlarm: '/api/alarms/:id';
+  deleteAlarm: '/api/alarms/:id';
+  acknowledgeAlarm: '/api/alarms/:id/acknowledge';
+}
+
+export interface ReportApiEndpoints {
+  getReports: '/api/reports';
+  createReport: '/api/reports';
+  getReportById: '/api/reports/:id';
+  deleteReport: '/api/reports/:id';
+}
