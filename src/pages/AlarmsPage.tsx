@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Card, 
@@ -53,7 +52,6 @@ import * as z from "zod";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Trash2 } from "lucide-react";
 
-// Mock alarms for demonstration
 const mockAlarms: AlarmConfig[] = [
   {
     id: 1,
@@ -89,7 +87,6 @@ const mockAlarms: AlarmConfig[] = [
   }
 ];
 
-// Form schema for alarm configuration
 const alarmFormSchema = z.object({
   flowMeterId: z.string().min(1, "Flow meter is required"),
   name: z.string().min(3, "Alarm name must be at least 3 characters"),
@@ -107,10 +104,8 @@ const AlarmsPage: React.FC = () => {
   const [alarms, setAlarms] = useState<AlarmConfig[]>(mockAlarms);
   const [open, setOpen] = useState(false);
   
-  // Auto-connect for client users
   React.useEffect(() => {
-    // In a real app, you'd check user role from auth context
-    const isClientUser = true; // Simulating a client user
+    const isClientUser = true;
     if (isClientUser) {
       autoConnectModbus(true);
     }
@@ -131,7 +126,6 @@ const AlarmsPage: React.FC = () => {
   });
   
   const onSubmit = (values: z.infer<typeof alarmFormSchema>) => {
-    // Convert string inputs to numbers where needed
     const newAlarm: AlarmConfig = {
       id: alarms.length + 1,
       flowMeterId: parseInt(values.flowMeterId),
@@ -161,7 +155,7 @@ const AlarmsPage: React.FC = () => {
       case "medium":
         return <Badge variant="secondary">Medium</Badge>;
       case "high":
-        return <Badge variant="warning">High</Badge>;
+        return <Badge variant="default">High</Badge>;
       case "critical":
         return <Badge variant="destructive">Critical</Badge>;
       default:
