@@ -42,6 +42,8 @@ interface ZoomableChartProps {
   xAxisLabel?: string;
   lineColor?: string;
   barColor?: string;
+  tagProperty?: string;
+  displayNameProperty?: string;
 }
 
 const ZoomableChart: React.FC<ZoomableChartProps> = ({
@@ -54,6 +56,8 @@ const ZoomableChart: React.FC<ZoomableChartProps> = ({
   xAxisLabel,
   lineColor = "#8884d8",
   barColor = "#82ca9d",
+  tagProperty,
+  displayNameProperty
 }) => {
   const [left, setLeft] = useState<string | number | undefined>(undefined);
   const [right, setRight] = useState<string | number | undefined>(undefined);
@@ -61,6 +65,16 @@ const ZoomableChart: React.FC<ZoomableChartProps> = ({
   const [refAreaRight, setRefAreaRight] = useState<string | number | undefined>(undefined);
   const [zoomedData, setZoomedData] = useState<DataPoint[]>(data);
   const [zoomLevel, setZoomLevel] = useState(0);
+  
+  // Group data by tag if tagProperty is provided
+  const uniqueTags = tagProperty ? 
+    [...new Set(data.map(item => item[tagProperty]))] : 
+    [];
+  
+  // Effect to update zoomed data when data changes
+  React.useEffect(() => {
+    setZoomedData(data);
+  }, [data]);
   
   const getAxisYDomain = useCallback((from: number, to: number, offset: number) => {
     // Get all values to determine min and max
@@ -97,8 +111,6 @@ const ZoomableChart: React.FC<ZoomableChartProps> = ({
     // Ensure left is before right
     if (leftIndex > rightIndex) {
       [leftIndex, rightIndex] = [rightIndex, leftIndex];
-      // Fix: Instead of swapping the setState functions (which causes an error),
-      // we'll call them with the swapped values
       setRefAreaLeft(refAreaRight);
       setRefAreaRight(refAreaLeft);
     }
@@ -168,14 +180,55 @@ const ZoomableChart: React.FC<ZoomableChartProps> = ({
           <p className="font-medium">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={`tooltip-${index}`} style={{ color: entry.color }}>
-              {entry.name}: {typeof entry.value === 'number' ? safeToFixed(entry.value, 2) : entry.value}
+              {displayNameProperty && entry.payload[displayNameProperty] 
+                ? entry.payload[displayNameProperty] 
+                : entry.name}: {typeof entry.value === 'number' ? safeToFixed(entry.value, 2) : entry.value}
             </p>
           ))}
         </div>
       );
     }
     return null;
-  }, []);
+  }, [displayNameProperty]);
+  
+  // Determine if we need to render multiple lines for different tags
+  const renderLines = () => {
+    if (!tagProperty || uniqueTags.length <= 1) {
+      return (
+        <Line 
+          type="monotone" 
+          dataKey={lineDataKey} 
+          stroke={lineColor} 
+          dot={false}
+          activeDot={{ r: 8 }}
+        />
+      );
+    }
+    
+    // Use different colors for each tag
+    const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#0088fe", "#00C49F"];
+    
+    return uniqueTags.map((tag, index) => {
+      const color = colors[index % colors.length];
+      const filteredData = data.filter(d => d[tagProperty] === tag);
+      const displayName = displayNameProperty && filteredData[0] ? 
+        filteredData[0][displayNameProperty] : 
+        tag;
+      
+      return (
+        <Line 
+          key={`line-${tag}`}
+          type="monotone" 
+          dataKey={lineDataKey} 
+          stroke={color}
+          dot={false}
+          activeDot={{ r: 8 }}
+          name={displayName}
+          data={zoomedData.filter(d => d[tagProperty] === tag)}
+        />
+      );
+    });
+  };
   
   return (
     <Card className="w-full">
@@ -220,7 +273,6 @@ const ZoomableChart: React.FC<ZoomableChartProps> = ({
         <div className="h-[350px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
-              data={zoomedData}
               margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
@@ -236,16 +288,21 @@ const ZoomableChart: React.FC<ZoomableChartProps> = ({
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
+              
               {barDataKey && (
                 <Bar dataKey={barDataKey} fill={barColor} />
               )}
-              <Line 
-                type="monotone" 
-                dataKey={lineDataKey} 
-                stroke={lineColor} 
-                dot={false}
-                activeDot={{ r: 8 }}
-              />
+              
+              {tagProperty && uniqueTags.length > 1 ? 
+                renderLines() : 
+                <Line 
+                  type="monotone" 
+                  dataKey={lineDataKey} 
+                  stroke={lineColor} 
+                  dot={false}
+                  activeDot={{ r: 8 }}
+                />
+              }
               
               {refAreaLeft && refAreaRight && (
                 <ReferenceArea 

@@ -234,6 +234,16 @@ const TrendsPage: React.FC = () => {
     return `${selectedFlowMeter.name} - Trend Data`;
   };
   
+  // Get appropriate unit for Y-axis based on selected tags
+  const getYAxisLabel = () => {
+    if (selectedTags.length === 1) {
+      return getUnitForTag(selectedTags[0]);
+    }
+    
+    // If multiple tags are selected, use a general label
+    return "Value";
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -364,7 +374,7 @@ const TrendsPage: React.FC = () => {
               title={getChartTitle()}
               lineDataKey="value"
               xAxisLabel="Time"
-              yAxisLabel={getUnitForTag(selectedTags[0])}
+              yAxisLabel={getYAxisLabel()}
               tagProperty="tag"
               displayNameProperty="displayName"
             />

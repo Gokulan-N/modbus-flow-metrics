@@ -5,12 +5,56 @@ import { useFlowData } from "@/context/FlowDataContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { format, startOfDay } from "date-fns";
+import { TrendingUp } from "lucide-react";
 
 const Dashboard: React.FC = () => {
-  const { connectedIds, isLoading } = useFlowData();
+  const { connectedIds, isLoading, flowMeters } = useFlowData();
   const navigate = useNavigate();
   
   const hasActiveConnections = connectedIds.length > 0;
+  
+  // Calculate today's consumption for each flow meter
+  const getTodayConsumption = (flowMeterId: number) => {
+    const flowMeter = flowMeters.find(fm => fm.id === flowMeterId);
+    if (!flowMeter) return 0;
+    
+    const today = startOfDay(new Date());
+    
+    // Get all data points from today
+    const todayPoints = flowMeter.historyData.filter(
+      point => point.timestamp >= today
+    );
+    
+    if (todayPoints.length < 2) return 0;
+    
+    // For this demo, we'll calculate consumption based on the difference between
+    // the first and last readings of the day
+    const firstPoint = todayPoints[0];
+    const lastPoint = todayPoints[todayPoints.length - 1];
+    
+    // In a real application, this would use the totalFlow field
+    // Here we're simulating it based on a percentage of the total flow
+    const firstIndex = flowMeter.historyData.findIndex(p => 
+      p.timestamp.getTime() === firstPoint.timestamp.getTime()
+    );
+    const lastIndex = flowMeter.historyData.findIndex(p => 
+      p.timestamp.getTime() === lastPoint.timestamp.getTime()
+    );
+    
+    const firstValue = flowMeter.totalFlow * (firstIndex / flowMeter.historyData.length);
+    const lastValue = flowMeter.totalFlow * (lastIndex / flowMeter.historyData.length);
+    
+    return lastValue - firstValue;
+  };
+  
+  // Format the consumption unit based on the flow meter unit
+  const getConsumptionUnit = (unit: string) => {
+    if (unit === "L/min") return "L";
+    if (unit === "m³/h") return "m³";
+    return unit.replace("/h", "").replace("/min", "");
+  };
   
   return (
     <div className="space-y-6">
@@ -31,6 +75,37 @@ const Dashboard: React.FC = () => {
           </Button>
         </div>
       </div>
+      
+      {/* Today's Consumption Overview */}
+      {hasActiveConnections && !isLoading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+          {flowMeters.map(flowMeter => {
+            const consumption = getTodayConsumption(flowMeter.id);
+            return (
+              <Card key={`consumption-${flowMeter.id}`} className="border-l-4 border-l-primary">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">{flowMeter.name}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="text-2xl font-bold">
+                        {consumption.toFixed(1)} {getConsumptionUnit(flowMeter.unit)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Consumption Today ({format(new Date(), "MMM d")})
+                      </div>
+                    </div>
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
       
       {!hasActiveConnections && !isLoading ? (
         <div className="flex flex-col items-center justify-center p-12 text-center">

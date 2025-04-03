@@ -1,64 +1,60 @@
 
 import React from "react";
-import { ModeToggle } from "@/components/ui/mode-toggle";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/AuthContext";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import AppSidebar from "./AppSidebar";
+import { Menu } from "lucide-react";
+import { useMobile } from "@/hooks/use-mobile";
+import { ModeToggle } from "@/components/ui/mode-toggle";
 import { useNavigate } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
-import { LogOut, User, UserCog } from "lucide-react";
-import { useFlowData } from "@/context/FlowDataContext";
+import { useAuth } from "@/context/AuthContext";
 
 const Header: React.FC = () => {
-  const { isAuthenticated, userRole, logout } = useAuth();
-  const { connectedIds } = useFlowData();
+  const { isMobile } = useMobile();
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   
-  const hasActiveConnections = connectedIds.length > 0;
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
   
   return (
-    <header className="border-b">
-      <div className="flex h-16 items-center px-4 container mx-auto">
-        <div className="flex items-center gap-2 font-semibold">
-          <span className="hidden sm:inline-block">Flow Meter Monitoring System</span>
-        </div>
-        
-        <div className="ml-auto flex items-center space-x-4">
-          {isAuthenticated && (
-            <>
-              <Badge 
-                variant={hasActiveConnections ? "success" : "destructive"}
-              >
-                {hasActiveConnections ? "Connected" : "Disconnected"}
-              </Badge>
-              
-              <div className="flex items-center gap-2">
-                {userRole === "admin" ? (
-                  <Badge variant="outline" className="flex items-center gap-1">
-                    <UserCog className="h-3 w-3" />
-                    Admin
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    Client
-                  </Badge>
-                )}
-                
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => {
-                    logout();
-                    navigate("/login");
-                  }}
-                >
-                  <LogOut className="h-5 w-5" />
+    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <div className="mr-4 flex">
+          {isMobile ? (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="mr-2">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle Menu</span>
                 </Button>
-              </div>
-            </>
-          )}
-          
-          <ModeToggle />
+              </SheetTrigger>
+              <SheetContent side="left" className="pr-0">
+                <AppSidebar />
+              </SheetContent>
+            </Sheet>
+          ) : null}
+          <a href="/" className="hidden items-center space-x-2 lg:flex">
+            <span className="hidden font-bold sm:inline-block">
+              Flow Meter Monitoring System
+            </span>
+          </a>
+        </div>
+        <div className="flex flex-1 items-center justify-end space-x-4">
+          <nav className="flex items-center space-x-2">
+            <ModeToggle />
+            {user && (
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                Logout
+              </Button>
+            )}
+          </nav>
         </div>
       </div>
     </header>
