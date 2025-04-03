@@ -21,13 +21,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format, subDays, subHours, subWeeks, subMonths } from "date-fns";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type TagType = "flowRate" | "totalFlow" | "consumption";
 type TimeRangeType = "last24h" | "last7d" | "last30d" | "custom";
 
 const TrendsPage: React.FC = () => {
   const { flowMeters, selectedFlowMeterId, setSelectedFlowMeterId } = useFlowData();
-  const [selectedTag, setSelectedTag] = useState<TagType>("flowRate");
+  const [selectedTags, setSelectedTags] = useState<TagType[]>(["flowRate"]);
   const [timeRange, setTimeRange] = useState<TimeRangeType>("last24h");
   const [startDate, setStartDate] = useState<string>(
     format(subDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm")
@@ -35,6 +38,10 @@ const TrendsPage: React.FC = () => {
   const [endDate, setEndDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd'T'HH:mm")
   );
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [isChartLoaded, setIsChartLoaded] = useState(false);
+  
+  const { toast } = useToast();
   
   // Select first flow meter by default if none is selected
   const effectiveSelectedId = selectedFlowMeterId || (flowMeters.length > 0 ? flowMeters[0].id : null);
@@ -67,77 +74,142 @@ const TrendsPage: React.FC = () => {
     setEndDate(format(now, "yyyy-MM-dd'T'HH:mm"));
   };
   
-  // Filter history data based on selected time range
-  const filteredHistoryData = useMemo(() => {
-    if (!selectedFlowMeter) return [];
+  // Handle tag selection toggle
+  const toggleTag = (tag: TagType) => {
+    if (selectedTags.includes(tag)) {
+      // Don't allow removing the last tag
+      if (selectedTags.length > 1) {
+        setSelectedTags(selectedTags.filter(t => t !== tag));
+      }
+    } else {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
+  
+  // Load trend data
+  const loadTrendData = () => {
+    if (!selectedFlowMeter) {
+      toast({
+        title: "No Flow Meter Selected",
+        description: "Please select a flow meter to view trend data",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (selectedTags.length === 0) {
+      toast({
+        title: "No Tags Selected",
+        description: "Please select at least one tag to display",
+        variant: "destructive"
+      });
+      return;
+    }
     
     const start = new Date(startDate);
     const end = new Date(endDate);
     
-    return selectedFlowMeter.historyData.filter(point => 
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      toast({
+        title: "Invalid Date Range",
+        description: "Please enter valid start and end dates",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (start >= end) {
+      toast({
+        title: "Invalid Date Range",
+        description: "Start date must be before end date",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Filter history data based on selected time range
+    const filteredHistoryData = selectedFlowMeter.historyData.filter(point => 
       point.timestamp >= start && point.timestamp <= end
     );
-  }, [selectedFlowMeter, startDate, endDate]);
-  
-  // Transform history data to include a name property for the chart
-  const formattedChartData = useMemo(() => {
-    if (!selectedFlowMeter) return [];
     
-    if (selectedTag === "flowRate") {
-      return filteredHistoryData.map(point => ({
-        ...point,
-        name: point.timestamp.toLocaleString(), // Use the timestamp as the name property
-        value: point.value
-      }));
-    } else if (selectedTag === "totalFlow") {
-      // Use totalFlow value
-      return filteredHistoryData.map(point => {
-        // For demo, we'll create a synthetic totalFlow that increases over time
-        const totalIndex = selectedFlowMeter.historyData.findIndex(p => 
-          p.timestamp.getTime() === point.timestamp.getTime()
+    // Format the data for the chart based on selected tags
+    const formattedData = [];
+    
+    for (const tag of selectedTags) {
+      if (tag === "flowRate") {
+        formattedData.push(
+          filteredHistoryData.map(point => ({
+            timestamp: point.timestamp,
+            name: point.timestamp.toLocaleString(),
+            value: point.value,
+            tag: "flowRate",
+            displayName: "Flow Rate"
+          }))
         );
-        const totalFlowValue = selectedFlowMeter.totalFlow * 
-          (totalIndex / selectedFlowMeter.historyData.length);
-        
-        return {
-          timestamp: point.timestamp,
-          name: point.timestamp.toLocaleString(),
-          value: totalFlowValue
-        };
-      });
-    } else {
-      // For consumption (delta of totalFlow)
-      const result = [];
-      let previousTotalFlow = 0;
-      
-      for (let i = 0; i < filteredHistoryData.length; i++) {
-        const point = filteredHistoryData[i];
-        // For demo, we'll create a synthetic totalFlow that increases over time
-        const totalIndex = selectedFlowMeter.historyData.findIndex(p => 
-          p.timestamp.getTime() === point.timestamp.getTime()
+      } else if (tag === "totalFlow") {
+        // Use totalFlow value with synthetic values
+        formattedData.push(
+          filteredHistoryData.map(point => {
+            const totalIndex = selectedFlowMeter.historyData.findIndex(p => 
+              p.timestamp.getTime() === point.timestamp.getTime()
+            );
+            const totalFlowValue = selectedFlowMeter.totalFlow * 
+              (totalIndex / selectedFlowMeter.historyData.length);
+            
+            return {
+              timestamp: point.timestamp,
+              name: point.timestamp.toLocaleString(),
+              value: totalFlowValue,
+              tag: "totalFlow",
+              displayName: "Total Flow"
+            };
+          })
         );
-        const totalFlowValue = selectedFlowMeter.totalFlow * 
-          (totalIndex / selectedFlowMeter.historyData.length);
+      } else if (tag === "consumption") {
+        // For consumption (delta of totalFlow)
+        const result = [];
+        let previousTotalFlow = 0;
         
-        const consumption = i === 0 ? 0 : totalFlowValue - previousTotalFlow;
-        previousTotalFlow = totalFlowValue;
+        for (let i = 0; i < filteredHistoryData.length; i++) {
+          const point = filteredHistoryData[i];
+          // For demo, we'll create a synthetic totalFlow that increases over time
+          const totalIndex = selectedFlowMeter.historyData.findIndex(p => 
+            p.timestamp.getTime() === point.timestamp.getTime()
+          );
+          const totalFlowValue = selectedFlowMeter.totalFlow * 
+            (totalIndex / selectedFlowMeter.historyData.length);
+          
+          const consumption = i === 0 ? 0 : totalFlowValue - previousTotalFlow;
+          previousTotalFlow = totalFlowValue;
+          
+          result.push({
+            timestamp: point.timestamp,
+            name: point.timestamp.toLocaleString(),
+            value: consumption,
+            tag: "consumption",
+            displayName: "Consumption"
+          });
+        }
         
-        result.push({
-          timestamp: point.timestamp,
-          name: point.timestamp.toLocaleString(),
-          value: consumption
-        });
+        formattedData.push(result);
       }
-      
-      return result;
     }
-  }, [selectedFlowMeter, selectedTag, filteredHistoryData]);
+    
+    // Flatten the data and set it for the chart
+    setChartData(formattedData.flat());
+    setIsChartLoaded(true);
+    
+    toast({
+      title: "Trend Data Loaded",
+      description: `Showing trend data for ${selectedFlowMeter.name}`
+    });
+  };
   
   // Get unit based on selected tag
-  const getUnitForTag = useMemo(() => {
+  const getUnitForTag = (tag: TagType) => {
     if (!selectedFlowMeter) return "";
     
-    if (selectedTag === "flowRate") {
+    if (tag === "flowRate") {
       return selectedFlowMeter.unit;
     } else {
       // Convert unit for total flow or consumption
@@ -148,34 +220,18 @@ const TrendsPage: React.FC = () => {
       }
       return selectedFlowMeter.unit.replace("/h", "").replace("/min", "");
     }
-  }, [selectedFlowMeter, selectedTag]);
+  };
   
   const handleSelectFlowMeter = (value: string) => {
     setSelectedFlowMeterId(parseInt(value));
+    setIsChartLoaded(false); // Reset chart when changing flow meter
   };
   
-  const handleSelectTag = (value: string) => {
-    setSelectedTag(value as TagType);
-  };
-  
-  // Get chart title based on selected tag
+  // Get chart title
   const getChartTitle = () => {
     if (!selectedFlowMeter) return "";
     
-    let tagName = "";
-    switch(selectedTag) {
-      case "flowRate":
-        tagName = "Flow Rate";
-        break;
-      case "totalFlow":
-        tagName = "Total Flow";
-        break;
-      case "consumption":
-        tagName = "Consumption";
-        break;
-    }
-    
-    return `${selectedFlowMeter.name} - ${tagName} Trend`;
+    return `${selectedFlowMeter.name} - Trend Data`;
   };
   
   return (
@@ -203,49 +259,6 @@ const TrendsPage: React.FC = () => {
       
       {selectedFlowMeter ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base font-normal">
-                  Current Value:
-                  <span className="ml-2 font-bold text-xl">
-                    {selectedFlowMeter.value.toFixed(2)} {selectedFlowMeter.unit}
-                  </span>
-                </CardTitle>
-                <Badge variant={
-                  selectedFlowMeter.status === 'normal' ? 'success' :
-                  selectedFlowMeter.status === 'warning' ? 'secondary' : 'destructive'
-                }>
-                  {selectedFlowMeter.status.toUpperCase()}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  Last updated: {selectedFlowMeter.lastUpdate.toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base font-normal">
-                  Total Flow:
-                  <span className="ml-2 font-bold text-xl">
-                    {selectedFlowMeter.totalFlow.toFixed(2)} {getUnitForTag}
-                  </span>
-                </CardTitle>
-                <Badge variant="outline">
-                  COMPUTED TAG
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  Calculated value based on cumulative flow rates
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Time Range Selection</CardTitle>
@@ -303,37 +316,66 @@ const TrendsPage: React.FC = () => {
           
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Select Tag to Display</CardTitle>
+              <CardTitle className="text-lg">Select Tags to Display</CardTitle>
             </CardHeader>
             <CardContent>
-              <RadioGroup 
-                value={selectedTag} 
-                onValueChange={handleSelectTag}
-                className="flex space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="flowRate" id="flowRate" />
-                  <Label htmlFor="flowRate">Flow Rate</Label>
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="flowRate" 
+                      checked={selectedTags.includes("flowRate")}
+                      onCheckedChange={() => toggleTag("flowRate")}
+                    />
+                    <Label htmlFor="flowRate">Flow Rate ({getUnitForTag("flowRate")})</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="totalFlow" 
+                      checked={selectedTags.includes("totalFlow")}
+                      onCheckedChange={() => toggleTag("totalFlow")}
+                    />
+                    <Label htmlFor="totalFlow">Total Flow ({getUnitForTag("totalFlow")})</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="consumption" 
+                      checked={selectedTags.includes("consumption")}
+                      onCheckedChange={() => toggleTag("consumption")}
+                    />
+                    <Label htmlFor="consumption">Consumption ({getUnitForTag("consumption")})</Label>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="totalFlow" id="totalFlow" />
-                  <Label htmlFor="totalFlow">Total Flow</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="consumption" id="consumption" />
-                  <Label htmlFor="consumption">Consumption (Delta)</Label>
-                </div>
-              </RadioGroup>
+                
+                <Button 
+                  onClick={loadTrendData}
+                  className="w-full sm:w-auto mt-4"
+                >
+                  <Search className="mr-2 h-4 w-4" />
+                  Load Trend Data
+                </Button>
+              </div>
             </CardContent>
           </Card>
           
-          <ZoomableChart 
-            data={formattedChartData} 
-            title={getChartTitle()}
-            lineDataKey="value"
-            xAxisLabel="Time"
-            yAxisLabel={getUnitForTag}
-          />
+          {isChartLoaded && chartData.length > 0 ? (
+            <ZoomableChart 
+              data={chartData} 
+              title={getChartTitle()}
+              lineDataKey="value"
+              xAxisLabel="Time"
+              yAxisLabel={getUnitForTag(selectedTags[0])}
+              tagProperty="tag"
+              displayNameProperty="displayName"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center bg-background border rounded-lg">
+              <div className="text-xl font-medium mb-2">No Trend Data Loaded</div>
+              <p className="text-muted-foreground mb-6">
+                Configure your settings above and click "Load Trend Data" to view the chart
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center p-12 text-center">
