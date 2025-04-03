@@ -1,3 +1,4 @@
+
 import React from "react";
 import { NavLink } from "react-router-dom";
 import { 
@@ -12,7 +13,7 @@ import {
   SidebarMenuItem, 
   SidebarTrigger 
 } from "@/components/ui/sidebar";
-import { FileText, BarChart3, Settings, Database } from "lucide-react";
+import { FileText, BarChart3, Settings, Database, Bell } from "lucide-react";
 import { useFlowData } from "@/context/FlowDataContext";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +56,19 @@ export const AppSidebar: React.FC = () => {
                   >
                     <BarChart3 className="h-5 w-5" />
                     <span>Trends</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/alarms"
+                    className={({ isActive }) => 
+                      cn("flex items-center gap-2", isActive ? "text-sidebar-primary" : "")
+                    }
+                  >
+                    <Bell className="h-5 w-5" />
+                    <span>Alarms</span>
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
