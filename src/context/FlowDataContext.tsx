@@ -1,28 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { fetchMockFlowMeters, fetchMockTrends } from "@/lib/mockDataService";
+import { generateMockFlowMeters, updateMockFlowMeter, generateHistoricalData } from "@/lib/mockDataService";
+import { FlowMeter as FlowMeterType } from "@/types";
 
-export type FlowMeter = {
-  id: number;
-  name: string;
-  location: string;
-  manufacturer: string;
-  model: string;
-  serialNumber: string;
-  installDate: string;
-  lastCalibration: string;
-  status: "active" | "inactive" | "maintenance" | "error";
-  flowRate: number;
-  totalFlow: number;
-  unit: "m3/h" | "L/min" | "gal/min";
-  alarms: {
-    id: number;
-    type: "high" | "low" | "fault";
-    value: number;
-    status: "active" | "acknowledged" | "resolved";
-    timestamp: string;
-  }[];
-};
+export type FlowMeter = FlowMeterType;
 
 export type DeviceConfiguration = {
   id?: number;
@@ -55,6 +36,8 @@ export type FlowDataContextProps = {
   trendData: FlowTrendData[];
   connectedIds: number[];
   isLoading: boolean;
+  selectedFlowMeterId: number | null;
+  setSelectedFlowMeterId: (id: number | null) => void;
   refreshData: () => void;
   fetchTrendData: (meterId: number, startTime: string, endTime: string) => Promise<FlowTrendData[]>;
   connectFlowMeter: (id: number) => void;
@@ -68,6 +51,8 @@ const FlowDataContext = createContext<FlowDataContextProps>({
   trendData: [],
   connectedIds: [],
   isLoading: true,
+  selectedFlowMeterId: null,
+  setSelectedFlowMeterId: () => {},
   refreshData: () => {},
   fetchTrendData: async () => [],
   connectFlowMeter: () => {},
@@ -85,11 +70,13 @@ export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [trendData, setTrendData] = useState<FlowTrendData[]>([]);
   const [connectedIds, setConnectedIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedFlowMeterId, setSelectedFlowMeterId] = useState<number | null>(null);
 
   const refreshData = async () => {
     setIsLoading(true);
     try {
-      const data = await fetchMockFlowMeters();
+      // Use the generateMockFlowMeters function instead of fetchMockFlowMeters
+      const data = generateMockFlowMeters();
       setFlowMeters(data);
     } catch (error) {
       console.error("Error fetching flow meter data:", error);
@@ -98,11 +85,23 @@ export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const fetchTrendData = async (meterId: number, startTime: string, endTime: string) => {
+  const fetchTrendData = async (meterId: number, startTime: string, endTime: string): Promise<FlowTrendData[]> => {
     try {
-      const data = await fetchMockTrends(meterId, startTime, endTime);
-      setTrendData(data);
-      return data;
+      // Generate trend data based on historical data
+      const flowMeter = flowMeters.find(fm => fm.id === meterId);
+      if (!flowMeter) return [];
+
+      // Convert historical data to trend data format
+      const history = generateHistoricalData(24); // Get 24 hours of data
+      
+      const trendData: FlowTrendData[] = history.map(point => ({
+        timestamp: point.timestamp.toISOString(),
+        flowRate: point.value,
+        totalFlow: flowMeter.totalFlow * (Math.random() * 0.1 + 0.95) // Simulated total flow
+      }));
+      
+      setTrendData(trendData);
+      return trendData;
     } catch (error) {
       console.error("Error fetching trend data:", error);
       return [];
@@ -142,6 +141,8 @@ export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         trendData,
         connectedIds,
         isLoading,
+        selectedFlowMeterId,
+        setSelectedFlowMeterId,
         refreshData,
         fetchTrendData,
         connectFlowMeter,

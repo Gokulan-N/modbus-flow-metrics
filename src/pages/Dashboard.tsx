@@ -22,31 +22,8 @@ const Dashboard: React.FC = () => {
     
     const today = startOfDay(new Date());
     
-    // Get all data points from today
-    const todayPoints = flowMeter.historyData.filter(
-      point => point.timestamp >= today
-    );
-    
-    if (todayPoints.length < 2) return 0;
-    
-    // For this demo, we'll calculate consumption based on the difference between
-    // the first and last readings of the day
-    const firstPoint = todayPoints[0];
-    const lastPoint = todayPoints[todayPoints.length - 1];
-    
-    // In a real application, this would use the totalFlow field
-    // Here we're simulating it based on a percentage of the total flow
-    const firstIndex = flowMeter.historyData.findIndex(p => 
-      p.timestamp.getTime() === firstPoint.timestamp.getTime()
-    );
-    const lastIndex = flowMeter.historyData.findIndex(p => 
-      p.timestamp.getTime() === lastPoint.timestamp.getTime()
-    );
-    
-    const firstValue = flowMeter.totalFlow * (firstIndex / flowMeter.historyData.length);
-    const lastValue = flowMeter.totalFlow * (lastIndex / flowMeter.historyData.length);
-    
-    return lastValue - firstValue;
+    // For this demo, just return a portion of the total flow as today's consumption
+    return flowMeter.totalFlow * 0.15 * (1 + Math.random() * 0.2);
   };
   
   // Format the consumption unit based on the flow meter unit
