@@ -1,242 +1,156 @@
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { FlowMeter, ModbusConfig, ModbusConnection } from "../types";
-import { 
-  defaultModbusConfig, 
-  generateMockFlowMeters, 
-  updateMockFlowMeter 
-} from "../lib/mockDataService";
-import { useToast } from "@/hooks/use-toast";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { fetchMockFlowMeters, fetchMockTrends } from "@/lib/mockDataService";
 
-interface FlowDataContextProps {
+export type FlowMeter = {
+  id: number;
+  name: string;
+  location: string;
+  manufacturer: string;
+  model: string;
+  serialNumber: string;
+  installDate: string;
+  lastCalibration: string;
+  status: "active" | "inactive" | "maintenance" | "error";
+  flowRate: number;
+  totalFlow: number;
+  unit: "m3/h" | "L/min" | "gal/min";
+  alarms: {
+    id: number;
+    type: "high" | "low" | "fault";
+    value: number;
+    status: "active" | "acknowledged" | "resolved";
+    timestamp: string;
+  }[];
+};
+
+export type DeviceConfiguration = {
+  id?: number;
+  name?: string;
+  ipAddress?: string;
+  port?: number;
+  slaveId?: number;
+  protocol?: "tcp" | "rtu" | "rtuovertcp";
+  enabled?: boolean;
+  pollRate?: number;
+  flowMeterId?: number;
+  registers?: {
+    id?: number;
+    type?: "flowRate" | "totalFlow";
+    description?: string;
+    address?: number;
+    dataType?: "int16" | "int32" | "float32" | "float64";
+    multiplier?: number;
+  }[];
+};
+
+export type FlowTrendData = {
+  timestamp: string;
+  flowRate: number;
+  totalFlow: number;
+};
+
+export type FlowDataContextProps = {
   flowMeters: FlowMeter[];
-  modbusConfig: ModbusConfig;
-  updateModbusConfig: (config: ModbusConfig) => void;
-  connectedIds: number[]; // IDs of connected Modbus connections
-  toggleConnection: (connectionId?: number) => void; // Toggle specific connection
-  selectedFlowMeterId: number | null;
-  setSelectedFlowMeterId: (id: number | null) => void;
+  trendData: FlowTrendData[];
+  connectedIds: number[];
   isLoading: boolean;
-  autoConnectModbus: (isClient?: boolean) => void;
-}
+  refreshData: () => void;
+  fetchTrendData: (meterId: number, startTime: string, endTime: string) => Promise<FlowTrendData[]>;
+  connectFlowMeter: (id: number) => void;
+  disconnectFlowMeter: (id: number) => void;
+  connectAll: () => void;
+  disconnectAll: () => void;
+};
 
-const FlowDataContext = createContext<FlowDataContextProps | undefined>(undefined);
+const FlowDataContext = createContext<FlowDataContextProps>({
+  flowMeters: [],
+  trendData: [],
+  connectedIds: [],
+  isLoading: true,
+  refreshData: () => {},
+  fetchTrendData: async () => [],
+  connectFlowMeter: () => {},
+  disconnectFlowMeter: () => {},
+  connectAll: () => {},
+  disconnectAll: () => {},
+});
+
+export function useFlowData() {
+  return useContext(FlowDataContext);
+}
 
 export const FlowDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [flowMeters, setFlowMeters] = useState<FlowMeter[]>([]);
-  const [modbusConfig, setModbusConfig] = useState<ModbusConfig>(defaultModbusConfig);
-  const [connectedIds, setConnectedIds] = useState<number[]>([]); // Track connected IDs
-  const [selectedFlowMeterId, setSelectedFlowMeterId] = useState<number | null>(null);
+  const [trendData, setTrendData] = useState<FlowTrendData[]>([]);
+  const [connectedIds, setConnectedIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
-  
-  // Initialize flow meters with mock data
-  useEffect(() => {
-    const initData = () => {
-      setIsLoading(true);
-      const mockData = generateMockFlowMeters(modbusConfig.flowMeters.length);
-      setFlowMeters(mockData);
-      setIsLoading(false);
-    };
-    
-    initData();
-  }, []);
-  
-  // Update flow meters when config changes (e.g. when adding new flow meters)
-  useEffect(() => {
-    // Check if the number of configured flow meters changed
-    if (flowMeters.length !== modbusConfig.flowMeters.length) {
-      // Generate or update flow meters based on configuration
-      setFlowMeters(prev => {
-        // Keep existing flow meters
-        const existing = prev.filter(fm => 
-          modbusConfig.flowMeters.some(config => config.id === fm.id)
-        );
-        
-        // Add new flow meters
-        const newFlowMeterIds = modbusConfig.flowMeters
-          .filter(config => !prev.some(fm => fm.id === config.id))
-          .map(config => config.id);
-        
-        const newFlowMeters = generateMockFlowMeters(newFlowMeterIds.length, existing.length);
-        
-        // Update IDs to match configuration
-        newFlowMeterIds.forEach((id, index) => {
-          if (newFlowMeters[index]) {
-            newFlowMeters[index].id = id;
-            
-            // Also update name to match config
-            const configItem = modbusConfig.flowMeters.find(fm => fm.id === id);
-            if (configItem) {
-              newFlowMeters[index].name = configItem.name;
-              newFlowMeters[index].unit = configItem.unit;
-            }
-          }
-        });
-        
-        return [...existing, ...newFlowMeters];
-      });
-    } else {
-      // Update properties of existing flow meters
-      setFlowMeters(prev => prev.map(flowMeter => {
-        const configItem = modbusConfig.flowMeters.find(fm => fm.id === flowMeter.id);
-        if (configItem) {
-          return {
-            ...flowMeter,
-            name: configItem.name,
-            unit: configItem.unit
-          };
-        }
-        return flowMeter;
-      }));
-    }
-  }, [modbusConfig]);
-  
-  // Set up polling for data updates when any connection is active
-  useEffect(() => {
-    let interval: number | undefined;
-    
-    if (connectedIds.length > 0) {
-      interval = window.setInterval(() => {
-        setFlowMeters(prev => 
-          prev.map(flowMeter => {
-            // Only update flow meters that belong to connected Modbus instances
-            const flowMeterConfig = modbusConfig.flowMeters.find(fm => fm.id === flowMeter.id);
-            if (flowMeterConfig && connectedIds.includes(flowMeterConfig.connectionId)) {
-              return updateMockFlowMeter(flowMeter);
-            }
-            return flowMeter;
-          })
-        );
-      }, 5000); // Update every 5 seconds
-    } else if (interval) {
-      clearInterval(interval);
-    }
-    
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [connectedIds, modbusConfig]);
-  
-  // Function to automatically connect Modbus for client users
-  const autoConnectModbus = (isClient = false) => {
-    if (isClient && connectedIds.length === 0) {
-      // Connect all for clients
-      setIsLoading(true);
-      setTimeout(() => {
-        const allIds = modbusConfig.connections.map(conn => conn.id);
-        setConnectedIds(allIds);
-        toast({
-          title: "Auto-Connected to Modbus",
-          description: `Connected to ${modbusConfig.connections.length} Modbus servers for continuous monitoring`,
-        });
-        setIsLoading(false);
-      }, 1500);
-    }
-  };
-  
-  const toggleConnection = (connectionId?: number) => {
+
+  const refreshData = async () => {
     setIsLoading(true);
-    
-    // If no ID provided, toggle all connections
-    if (connectionId === undefined) {
-      // If any are connected, disconnect all
-      if (connectedIds.length > 0) {
-        setConnectedIds([]);
-        toast({
-          title: "All Modbus Disconnected",
-          description: "All connections to Modbus servers have been closed",
-        });
-      } else {
-        // Connect all
-        setTimeout(() => {
-          const allIds = modbusConfig.connections.map(conn => conn.id);
-          setConnectedIds(allIds);
-          toast({
-            title: "All Modbus Connected",
-            description: `Connected to ${modbusConfig.connections.length} Modbus servers`,
-          });
-          setIsLoading(false);
-        }, 1500);
-        return;
-      }
-    } else {
-      // Toggle specific connection
-      setTimeout(() => {
-        if (connectedIds.includes(connectionId)) {
-          // Disconnect
-          setConnectedIds(prev => prev.filter(id => id !== connectionId));
-          
-          const connection = modbusConfig.connections.find(c => c.id === connectionId);
-          if (connection) {
-            toast({
-              title: "Modbus Disconnected",
-              description: `Disconnected from ${connection.name} (${connection.ipAddress}:${connection.port})`,
-            });
-          }
-        } else {
-          // Connect
-          setConnectedIds(prev => [...prev, connectionId]);
-          
-          const connection = modbusConfig.connections.find(c => c.id === connectionId);
-          if (connection) {
-            toast({
-              title: "Modbus Connected",
-              description: `Connected to ${connection.name} (${connection.ipAddress}:${connection.port})`,
-            });
-          }
-        }
-      }, 1500);
-    }
-    
-    setTimeout(() => {
+    try {
+      const data = await fetchMockFlowMeters();
+      setFlowMeters(data);
+    } catch (error) {
+      console.error("Error fetching flow meter data:", error);
+    } finally {
       setIsLoading(false);
-    }, 1500);
-  };
-  
-  const updateModbusConfig = (config: ModbusConfig) => {
-    setModbusConfig(config);
-    
-    // If any connections are active, disconnect them
-    if (connectedIds.length > 0) {
-      setConnectedIds([]);
-      toast({
-        title: "Configuration Updated",
-        description: "All Modbus connections closed due to configuration change",
-      });
-    } else {
-      toast({
-        title: "Configuration Updated",
-        description: "Modbus configuration has been updated",
-      });
     }
   };
-  
+
+  const fetchTrendData = async (meterId: number, startTime: string, endTime: string) => {
+    try {
+      const data = await fetchMockTrends(meterId, startTime, endTime);
+      setTrendData(data);
+      return data;
+    } catch (error) {
+      console.error("Error fetching trend data:", error);
+      return [];
+    }
+  };
+
+  const connectFlowMeter = (id: number) => {
+    setConnectedIds(prev => {
+      if (prev.includes(id)) return prev;
+      return [...prev, id];
+    });
+  };
+
+  const disconnectFlowMeter = (id: number) => {
+    setConnectedIds(prev => prev.filter(mId => mId !== id));
+  };
+
+  const connectAll = () => {
+    const allIds = flowMeters.map(meter => meter.id);
+    setConnectedIds(allIds);
+  };
+
+  const disconnectAll = () => {
+    setConnectedIds([]);
+  };
+
+  useEffect(() => {
+    refreshData();
+    // Mock connected devices
+    setConnectedIds([1]);
+  }, []);
+
   return (
     <FlowDataContext.Provider
       value={{
         flowMeters,
-        modbusConfig,
-        updateModbusConfig,
+        trendData,
         connectedIds,
-        toggleConnection,
-        selectedFlowMeterId,
-        setSelectedFlowMeterId,
         isLoading,
-        autoConnectModbus
+        refreshData,
+        fetchTrendData,
+        connectFlowMeter,
+        disconnectFlowMeter,
+        connectAll,
+        disconnectAll,
       }}
     >
       {children}
     </FlowDataContext.Provider>
   );
-};
-
-export const useFlowData = () => {
-  const context = useContext(FlowDataContext);
-  if (context === undefined) {
-    throw new Error("useFlowData must be used within a FlowDataProvider");
-  }
-  return context;
 };

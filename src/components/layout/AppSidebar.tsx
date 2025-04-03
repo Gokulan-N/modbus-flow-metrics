@@ -122,3 +122,5 @@ export const AppSidebar: React.FC = () => {
     </Sidebar>
   );
 };
+
+export default AppSidebar;

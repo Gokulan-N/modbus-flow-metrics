@@ -1,108 +1,92 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { toast } from "@/components/ui/use-toast";
 
-type UserRole = "admin" | "client" | null;
+type User = {
+  id: string;
+  username: string;
+  email: string;
+  role: "admin" | "operator" | "viewer";
+};
 
-interface AuthContextProps {
+export type AuthContextProps = {
   isAuthenticated: boolean;
-  userRole: UserRole;
-  login: (username: string, password: string, role: UserRole) => boolean;
+  isLoading: boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-}
+  user: User | null;
+};
 
-const AuthContext = createContext<AuthContextProps | undefined>(undefined);
+const AuthContext = createContext<AuthContextProps>({
+  isAuthenticated: false,
+  isLoading: true,
+  login: async () => false,
+  logout: () => {},
+  user: null,
+});
+
+export const useAuth = () => useContext(AuthContext);
+
+// Mock user data
+const MOCK_USER: User = {
+  id: "1",
+  username: "admin",
+  email: "admin@example.com",
+  role: "admin",
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [userRole, setUserRole] = useState<UserRole>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on startup
+  // Check for existing session on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("flowMeterUser");
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setIsAuthenticated(true);
-        setUserRole(user.role);
-      } catch (error) {
-        localStorage.removeItem("flowMeterUser");
+    const checkAuth = async () => {
+      const storedUser = localStorage.getItem("user");
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser));
+        } catch (e) {
+          console.error("Failed to parse stored user", e);
+          localStorage.removeItem("user");
+        }
       }
-    }
+      setIsLoading(false);
+    };
+
+    checkAuth();
   }, []);
 
-  // Set up credentials for admin and client roles
-  // In a real app, this would be connected to a secure backend
-  const adminCredentials = {
-    username: "admin",
-    password: "admin123",
-  };
-
-  const clientCredentials = {
-    username: "client",
-    password: "client123",
-  };
-
-  const login = (username: string, password: string, role: UserRole): boolean => {
-    let isValid = false;
-
-    if (role === "admin") {
-      isValid = username === adminCredentials.username && password === adminCredentials.password;
-    } else if (role === "client") {
-      isValid = username === clientCredentials.username && password === clientCredentials.password;
-    }
-
-    if (isValid) {
-      setIsAuthenticated(true);
-      setUserRole(role);
-      localStorage.setItem("flowMeterUser", JSON.stringify({ username, role }));
-      
-      toast({
-        title: "Login Successful",
-        description: `Welcome, ${username}!`,
-      });
-      
-      return true;
-    } else {
-      toast({
-        title: "Login Failed",
-        description: "Invalid username or password",
-        variant: "destructive",
-      });
-      
-      return false;
-    }
+  const login = async (username: string, password: string): Promise<boolean> => {
+    // In a real app, this would be an API call
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (username === "admin" && password === "password") {
+          setUser(MOCK_USER);
+          localStorage.setItem("user", JSON.stringify(MOCK_USER));
+          resolve(true);
+        } else {
+          resolve(false);
+        }
+      }, 1000);
+    });
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
-    setUserRole(null);
-    localStorage.removeItem("flowMeterUser");
-    
-    toast({
-      title: "Logged Out",
-      description: "You have been logged out successfully",
-    });
+    setUser(null);
+    localStorage.removeItem("user");
   };
 
   return (
     <AuthContext.Provider
       value={{
-        isAuthenticated,
-        userRole,
+        isAuthenticated: !!user,
+        isLoading,
         login,
         logout,
+        user,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
 };

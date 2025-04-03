@@ -6,17 +6,17 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import AppSidebar from "./AppSidebar";
+import { AppSidebar } from "./AppSidebar";
 import { Menu } from "lucide-react";
-import { useMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 const Header: React.FC = () => {
-  const { isMobile } = useMobile();
+  const { isMobile } = useIsMobile();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
   
   const handleLogout = () => {
     logout();
@@ -49,7 +49,7 @@ const Header: React.FC = () => {
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">
             <ModeToggle />
-            {user && (
+            {isAuthenticated && (
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 Logout
               </Button>
