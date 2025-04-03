@@ -42,6 +42,9 @@ export interface FlowMeterConfig {
   dataType: 'float' | 'int16' | 'int32' | 'uint16' | 'uint32';
   scaleFactor: number;
   unit: string;
+  totalFlowRegisterAddress?: number; // Address for total flow register
+  totalFlowRegisterType?: 'holding' | 'input'; // Register type for total flow
+  totalFlowDataType?: 'float' | 'int16' | 'int32' | 'uint16' | 'uint32'; // Data type for total flow
 }
 
 // Report type
@@ -54,6 +57,20 @@ export interface Report {
   createdAt: Date;
   status: 'generating' | 'complete' | 'error';
   downloadUrl?: string;
+  format: 'summary' | 'hourly' | 'raw'; // Report format
+}
+
+// Scheduled report type
+export interface ScheduledReport {
+  id: number;
+  name: string;
+  flowMeterIds: number[];
+  frequency: "daily" | "weekly" | "monthly";
+  format: "summary" | "hourly" | "raw";
+  recipients: string[];
+  lastSent?: Date;
+  nextSchedule: Date;
+  enabled: boolean;
 }
 
 // Alarm configuration type
@@ -78,6 +95,8 @@ export interface FlowMeterApiEndpoints {
   getFlowMeterHistory: '/api/flow-meters/:id/history';
   getFlowMeterAlarms: '/api/flow-meters/:id/alarms';
   addFlowMeterData: '/api/flow-meters/:id/data';
+  getTotalFlow: '/api/flow-meters/:id/total-flow';
+  getConsumption: '/api/flow-meters/:id/consumption';
 }
 
 export interface AlarmApiEndpoints {
@@ -93,4 +112,18 @@ export interface ReportApiEndpoints {
   createReport: '/api/reports';
   getReportById: '/api/reports/:id';
   deleteReport: '/api/reports/:id';
+  scheduleReport: '/api/reports/schedule';
+  getScheduledReports: '/api/reports/scheduled';
+  updateScheduledReport: '/api/reports/scheduled/:id';
+  deleteScheduledReport: '/api/reports/scheduled/:id';
+}
+
+// User API endpoints
+export interface UserApiEndpoints {
+  login: '/api/auth/login';
+  logout: '/api/auth/logout';
+  register: '/api/auth/register';
+  getCurrentUser: '/api/auth/me';
+  updateUserProfile: '/api/users/:id';
+  changePassword: '/api/users/:id/password';
 }

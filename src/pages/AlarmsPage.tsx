@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Card, 
@@ -7,484 +8,439 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import { useFlowData } from "@/context/FlowDataContext";
 import { Button } from "@/components/ui/button";
 import { 
   Table, 
   TableBody, 
-  TableCaption, 
   TableCell, 
   TableHead, 
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from "@/components/ui/dialog";
-import { 
-  Form, 
-  FormControl, 
-  FormDescription, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from "@/components/ui/form";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { AlarmConfig } from "@/types";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { AlarmConfig } from "@/types";
+import { useFlowData } from "@/context/FlowDataContext";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Bell, Edit, Trash2, Mail } from "lucide-react";
 
+// Mock alarm data to demonstrate functionality
 const mockAlarms: AlarmConfig[] = [
   {
     id: 1,
     flowMeterId: 1,
-    name: "High Flow Rate Alert",
-    highLimit: 75,
+    name: "High Flow Rate Alarm",
+    highLimit: 100,
     deadband: 2,
     enabled: true,
-    severity: "medium",
+    severity: "high",
     notifyViaEmail: true,
     emailRecipients: ["operator@example.com"]
   },
   {
     id: 2,
     flowMeterId: 2,
-    name: "Critical Low Flow",
+    name: "Low Flow Rate Alarm",
     lowLimit: 10,
     deadband: 1,
     enabled: true,
-    severity: "critical",
-    notifyViaEmail: true,
-    emailRecipients: ["alerts@example.com", "manager@example.com"]
+    severity: "medium",
+    notifyViaEmail: false,
   },
   {
     id: 3,
-    flowMeterId: 1,
-    name: "Preventive Maintenance Notice",
-    highLimit: 90,
-    deadband: 5,
+    flowMeterId: 3,
+    name: "Flow Rate Out of Range",
+    highLimit: 150,
+    lowLimit: 5,
+    deadband: 3,
     enabled: false,
-    severity: "low",
-    notifyViaEmail: false
+    severity: "critical",
+    notifyViaEmail: true,
+    emailRecipients: ["manager@example.com", "operator@example.com"]
   }
 ];
 
-const alarmFormSchema = z.object({
-  flowMeterId: z.string().min(1, "Flow meter is required"),
-  name: z.string().min(3, "Alarm name must be at least 3 characters"),
-  highLimit: z.string().optional(),
-  lowLimit: z.string().optional(),
-  deadband: z.string().default("1"),
-  enabled: z.boolean().default(true),
-  severity: z.enum(["low", "medium", "high", "critical"]),
-  notifyViaEmail: z.boolean().default(false),
-  emailRecipients: z.string().optional()
-});
+// Define the maximum number of alarms allowed (License limit)
+const MAX_ALARMS_ALLOWED = 10;
 
-const AlarmsPage: React.FC = () => {
-  const { flowMeters, autoConnectModbus } = useFlowData();
+const AlarmsPage = () => {
+  const { flowMeters } = useFlowData();
   const [alarms, setAlarms] = useState<AlarmConfig[]>(mockAlarms);
-  const [open, setOpen] = useState(false);
-  
-  React.useEffect(() => {
-    const isClientUser = true;
-    if (isClientUser) {
-      autoConnectModbus(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentAlarm, setCurrentAlarm] = useState<AlarmConfig | null>(null);
+  const [isAddMode, setIsAddMode] = useState(false);
+  const { toast } = useToast();
+
+  const handleAddAlarm = () => {
+    if (alarms.length >= MAX_ALARMS_ALLOWED) {
+      toast({
+        title: "License Limit Reached",
+        description: `You can only create up to ${MAX_ALARMS_ALLOWED} alarms with your current license.`,
+        variant: "destructive"
+      });
+      return;
     }
-  }, [autoConnectModbus]);
-  
-  const form = useForm<z.infer<typeof alarmFormSchema>>({
-    resolver: zodResolver(alarmFormSchema),
-    defaultValues: {
-      name: "",
-      highLimit: "",
-      lowLimit: "",
-      deadband: "1",
+
+    setIsAddMode(true);
+    setCurrentAlarm({
+      id: Math.max(0, ...alarms.map(a => a.id)) + 1,
+      flowMeterId: flowMeters[0]?.id || 0,
+      name: "New Alarm",
+      deadband: 1,
       enabled: true,
       severity: "medium",
-      notifyViaEmail: false,
-      emailRecipients: ""
-    },
-  });
-  
-  const onSubmit = (values: z.infer<typeof alarmFormSchema>) => {
-    const newAlarm: AlarmConfig = {
-      id: alarms.length + 1,
-      flowMeterId: parseInt(values.flowMeterId),
-      name: values.name,
-      highLimit: values.highLimit ? parseFloat(values.highLimit) : undefined,
-      lowLimit: values.lowLimit ? parseFloat(values.lowLimit) : undefined,
-      deadband: parseFloat(values.deadband || "1"),
-      enabled: values.enabled,
-      severity: values.severity,
-      notifyViaEmail: values.notifyViaEmail,
-      emailRecipients: values.emailRecipients ? values.emailRecipients.split(",").map(email => email.trim()) : []
-    };
-    
-    setAlarms([...alarms, newAlarm]);
-    setOpen(false);
-    form.reset();
+      notifyViaEmail: false
+    });
+    setIsDialogOpen(true);
   };
-  
-  const deleteAlarm = (id: number) => {
+
+  const handleEditAlarm = (alarm: AlarmConfig) => {
+    setIsAddMode(false);
+    setCurrentAlarm({...alarm});
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteAlarm = (id: number) => {
     setAlarms(alarms.filter(alarm => alarm.id !== id));
+    toast({
+      title: "Alarm Deleted",
+      description: "The alarm has been successfully removed."
+    });
   };
-  
-  const getSeverityBadge = (severity: string) => {
+
+  const handleSaveAlarm = () => {
+    if (!currentAlarm) return;
+
+    // Validation
+    if (!currentAlarm.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Alarm name is required.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (isAddMode) {
+      setAlarms([...alarms, currentAlarm]);
+      toast({
+        title: "Alarm Created",
+        description: "New alarm has been successfully created."
+      });
+    } else {
+      setAlarms(alarms.map(alarm => alarm.id === currentAlarm.id ? currentAlarm : alarm));
+      toast({
+        title: "Alarm Updated",
+        description: "Alarm has been successfully updated."
+      });
+    }
+    
+    setIsDialogOpen(false);
+  };
+
+  const getSeverityBadge = (severity: AlarmConfig['severity']) => {
     switch (severity) {
-      case "low":
-        return <Badge variant="outline">Low</Badge>;
-      case "medium":
-        return <Badge variant="secondary">Medium</Badge>;
-      case "high":
-        return <Badge variant="default">High</Badge>;
-      case "critical":
-        return <Badge variant="destructive">Critical</Badge>;
+      case 'low':
+        return <Badge variant="secondary">Low</Badge>;
+      case 'medium':
+        return <Badge variant="default">Medium</Badge>;
+      case 'high':
+        return <Badge variant="destructive">High</Badge>;
+      case 'critical':
+        return <Badge variant="destructive" className="bg-purple-700">Critical</Badge>;
       default:
-        return <Badge>{severity}</Badge>;
+        return <Badge variant="outline">Unknown</Badge>;
     }
   };
-  
-  const getFlowMeterName = (id: number) => {
-    const meter = flowMeters.find(fm => fm.id === id);
-    return meter ? meter.name : `Flow Meter ${id}`;
+
+  const getFlowMeterName = (flowMeterId: number) => {
+    const flowMeter = flowMeters.find(fm => fm.id === flowMeterId);
+    return flowMeter ? flowMeter.name : `Flow Meter ${flowMeterId}`;
   };
-  
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Alarm Configuration</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Alarm
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create New Alarm</DialogTitle>
-              <DialogDescription>
-                Configure alarm thresholds and notification settings
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="flowMeterId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Flow Meter</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select flow meter" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {flowMeters.map(meter => (
-                            <SelectItem key={meter.id} value={meter.id.toString()}>
-                              {meter.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Alarm Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., High Flow Alert" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="highLimit"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>High Limit</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="Optional" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lowLimit"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Low Limit</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="Optional" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="deadband"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Deadband</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Prevents alarm from oscillating near threshold
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="severity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Severity</FormLabel>
-                      <Select 
-                        onValueChange={field.onChange} 
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select severity" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="critical">Critical</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="enabled"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5">
-                        <FormLabel>Enabled</FormLabel>
-                        <FormDescription>
-                          Activate this alarm
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="notifyViaEmail"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5">
-                        <FormLabel>Email Notifications</FormLabel>
-                        <FormDescription>
-                          Send email when alarm triggers
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                {form.watch("notifyViaEmail") && (
-                  <FormField
-                    control={form.control}
-                    name="emailRecipients"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Recipients</FormLabel>
-                        <FormControl>
-                          <Input placeholder="email1@example.com, email2@example.com" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Comma-separated list of email addresses
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-                <DialogFooter>
-                  <Button type="submit">Save Alarm</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        <h2 className="text-2xl font-bold">Alarms Configuration</h2>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="mr-2">
+            {alarms.length}/{MAX_ALARMS_ALLOWED} Alarms
+          </Badge>
+          <Button 
+            onClick={handleAddAlarm}
+            disabled={alarms.length >= MAX_ALARMS_ALLOWED}
+          >
+            Add Alarm
+          </Button>
+        </div>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Configured Alarms</CardTitle>
           <CardDescription>
-            Manage alarm thresholds and notification settings for flow meters
+            Manage all flow meter alarms and notifications
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableCaption>List of configured alarms</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Flow Meter</TableHead>
-                <TableHead>Thresholds</TableHead>
-                <TableHead>Severity</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Notifications</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {alarms.map(alarm => (
-                <TableRow key={alarm.id}>
-                  <TableCell className="font-medium">{alarm.name}</TableCell>
-                  <TableCell>{getFlowMeterName(alarm.flowMeterId)}</TableCell>
-                  <TableCell>
-                    {alarm.highLimit && <div>High: {alarm.highLimit}</div>}
-                    {alarm.lowLimit && <div>Low: {alarm.lowLimit}</div>}
-                    <div className="text-xs text-muted-foreground">Deadband: {alarm.deadband}</div>
-                  </TableCell>
-                  <TableCell>{getSeverityBadge(alarm.severity)}</TableCell>
-                  <TableCell>
-                    <Badge variant={alarm.enabled ? "success" : "outline"}>
-                      {alarm.enabled ? "Enabled" : "Disabled"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {alarm.notifyViaEmail ? (
-                      <div>
-                        <Badge variant="secondary">Email</Badge>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {alarm.emailRecipients?.join(", ")}
-                        </div>
-                      </div>
-                    ) : (
-                      <Badge variant="outline">None</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => deleteAlarm(alarm.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {alarms.length === 0 && (
+          <ScrollArea className="h-[400px]">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                    No alarms configured. Click "Add Alarm" to create one.
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Flow Meter</TableHead>
+                  <TableHead>Limits</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Notifications</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
+              </TableHeader>
+              <TableBody>
+                {alarms.map(alarm => (
+                  <TableRow key={alarm.id}>
+                    <TableCell className="font-medium">{alarm.name}</TableCell>
+                    <TableCell>{getFlowMeterName(alarm.flowMeterId)}</TableCell>
+                    <TableCell>
+                      {alarm.highLimit !== undefined && <div>High: {alarm.highLimit}</div>}
+                      {alarm.lowLimit !== undefined && <div>Low: {alarm.lowLimit}</div>}
+                      <div className="text-xs text-muted-foreground">Deadband: {alarm.deadband}</div>
+                    </TableCell>
+                    <TableCell>{getSeverityBadge(alarm.severity)}</TableCell>
+                    <TableCell>
+                      <Badge variant={alarm.enabled ? "success" : "outline"}>
+                        {alarm.enabled ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {alarm.notifyViaEmail ? (
+                        <div className="flex items-center">
+                          <Mail className="h-4 w-4 mr-1 text-blue-500" />
+                          <span className="text-xs">
+                            {alarm.emailRecipients?.length || 0} recipients
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No email</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleEditAlarm(alarm)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleDeleteAlarm(alarm.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {alarms.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-10">
+                      <Bell className="h-8 w-8 mx-auto text-muted-foreground opacity-20 mb-2" />
+                      <p className="text-muted-foreground">No alarms configured yet</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-4"
+                        onClick={handleAddAlarm}
+                      >
+                        Add your first alarm
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      {/* Alarm Add/Edit Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{isAddMode ? "Add New Alarm" : "Edit Alarm"}</DialogTitle>
+            <DialogDescription>
+              Configure alarm settings for flow meter monitoring
+            </DialogDescription>
+          </DialogHeader>
+          
+          {currentAlarm && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Alarm Name</Label>
+                  <Input 
+                    id="name" 
+                    value={currentAlarm.name}
+                    onChange={(e) => setCurrentAlarm({...currentAlarm, name: e.target.value})}
+                    placeholder="Enter alarm name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="flowMeter">Flow Meter</Label>
+                  <Select 
+                    value={currentAlarm.flowMeterId.toString()}
+                    onValueChange={(value) => setCurrentAlarm({...currentAlarm, flowMeterId: Number(value)})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select flow meter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {flowMeters.map(fm => (
+                        <SelectItem key={fm.id} value={fm.id.toString()}>
+                          {fm.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="highLimit">High Limit</Label>
+                  <Input 
+                    id="highLimit" 
+                    type="number"
+                    value={currentAlarm.highLimit?.toString() || ""}
+                    onChange={(e) => setCurrentAlarm({
+                      ...currentAlarm, 
+                      highLimit: e.target.value ? Number(e.target.value) : undefined
+                    })}
+                    placeholder="Optional"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lowLimit">Low Limit</Label>
+                  <Input 
+                    id="lowLimit" 
+                    type="number"
+                    value={currentAlarm.lowLimit?.toString() || ""}
+                    onChange={(e) => setCurrentAlarm({
+                      ...currentAlarm, 
+                      lowLimit: e.target.value ? Number(e.target.value) : undefined
+                    })}
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="deadband">Deadband</Label>
+                  <Input 
+                    id="deadband" 
+                    type="number"
+                    value={currentAlarm.deadband}
+                    onChange={(e) => setCurrentAlarm({
+                      ...currentAlarm, 
+                      deadband: Number(e.target.value) || 0
+                    })}
+                    placeholder="Enter deadband value"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Prevents alarm from triggering when value is near the threshold
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="severity">Severity</Label>
+                  <Select 
+                    value={currentAlarm.severity}
+                    onValueChange={(value) => setCurrentAlarm({
+                      ...currentAlarm, 
+                      severity: value as "low" | "medium" | "high" | "critical"
+                    })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select severity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    id="enabled"
+                    checked={currentAlarm.enabled}
+                    onCheckedChange={(value) => setCurrentAlarm({...currentAlarm, enabled: value})}
+                  />
+                  <Label htmlFor="enabled">Alarm Enabled</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    id="notifyEmail"
+                    checked={currentAlarm.notifyViaEmail}
+                    onCheckedChange={(value) => setCurrentAlarm({...currentAlarm, notifyViaEmail: value})}
+                  />
+                  <Label htmlFor="notifyEmail">Email Notifications</Label>
+                </div>
+              </div>
+              
+              {currentAlarm.notifyViaEmail && (
+                <div className="space-y-2">
+                  <Label htmlFor="emails">Email Recipients (comma separated)</Label>
+                  <Input 
+                    id="emails"
+                    value={currentAlarm.emailRecipients?.join(", ") || ""}
+                    onChange={(e) => setCurrentAlarm({
+                      ...currentAlarm, 
+                      emailRecipients: e.target.value.split(",").map(email => email.trim()).filter(email => email)
+                    })}
+                    placeholder="e.g. operator@example.com, manager@example.com"
+                  />
+                </div>
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>API Documentation</CardTitle>
-          <CardDescription>
-            Available REST API endpoints for alarm management
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium">GET /api/alarms</h3>
-              <p className="text-sm text-muted-foreground">
-                Retrieve all configured alarms
-              </p>
             </div>
-            <div>
-              <h3 className="text-lg font-medium">POST /api/alarms</h3>
-              <p className="text-sm text-muted-foreground">
-                Create a new alarm configuration
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium">GET /api/alarms/:id</h3>
-              <p className="text-sm text-muted-foreground">
-                Get a specific alarm by ID
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium">PUT /api/alarms/:id</h3>
-              <p className="text-sm text-muted-foreground">
-                Update an existing alarm
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium">DELETE /api/alarms/:id</h3>
-              <p className="text-sm text-muted-foreground">
-                Delete an alarm configuration
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium">GET /api/flow-meters/:id/alarms</h3>
-              <p className="text-sm text-muted-foreground">
-                Get all alarms for a specific flow meter
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAlarm}>
+              {isAddMode ? "Create Alarm" : "Update Alarm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -19,45 +19,119 @@ import ZoomableChart from "@/components/charts/ZoomableChart";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { format, subDays, subHours, subWeeks, subMonths } from "date-fns";
 
-type TagType = "flowRate" | "totalFlow";
+type TagType = "flowRate" | "totalFlow" | "consumption";
+type TimeRangeType = "last24h" | "last7d" | "last30d" | "custom";
 
 const TrendsPage: React.FC = () => {
   const { flowMeters, selectedFlowMeterId, setSelectedFlowMeterId } = useFlowData();
   const [selectedTag, setSelectedTag] = useState<TagType>("flowRate");
+  const [timeRange, setTimeRange] = useState<TimeRangeType>("last24h");
+  const [startDate, setStartDate] = useState<string>(
+    format(subDays(new Date(), 1), "yyyy-MM-dd'T'HH:mm")
+  );
+  const [endDate, setEndDate] = useState<string>(
+    format(new Date(), "yyyy-MM-dd'T'HH:mm")
+  );
   
   // Select first flow meter by default if none is selected
   const effectiveSelectedId = selectedFlowMeterId || (flowMeters.length > 0 ? flowMeters[0].id : null);
   
   const selectedFlowMeter = flowMeters.find(fm => fm.id === effectiveSelectedId);
   
+  // Handle time range selection
+  const handleTimeRangeChange = (value: TimeRangeType) => {
+    setTimeRange(value);
+    
+    const now = new Date();
+    let start = now;
+    
+    switch(value) {
+      case "last24h":
+        start = subHours(now, 24);
+        break;
+      case "last7d":
+        start = subDays(now, 7);
+        break;
+      case "last30d":
+        start = subMonths(now, 1);
+        break;
+      case "custom":
+        // Don't change the dates for custom
+        return;
+    }
+    
+    setStartDate(format(start, "yyyy-MM-dd'T'HH:mm"));
+    setEndDate(format(now, "yyyy-MM-dd'T'HH:mm"));
+  };
+  
+  // Filter history data based on selected time range
+  const filteredHistoryData = useMemo(() => {
+    if (!selectedFlowMeter) return [];
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    return selectedFlowMeter.historyData.filter(point => 
+      point.timestamp >= start && point.timestamp <= end
+    );
+  }, [selectedFlowMeter, startDate, endDate]);
+  
   // Transform history data to include a name property for the chart
   const formattedChartData = useMemo(() => {
     if (!selectedFlowMeter) return [];
     
     if (selectedTag === "flowRate") {
-      return selectedFlowMeter.historyData.map(point => ({
+      return filteredHistoryData.map(point => ({
         ...point,
         name: point.timestamp.toLocaleString(), // Use the timestamp as the name property
         value: point.value
       }));
+    } else if (selectedTag === "totalFlow") {
+      // Use totalFlow value
+      return filteredHistoryData.map(point => {
+        // For demo, we'll create a synthetic totalFlow that increases over time
+        const totalIndex = selectedFlowMeter.historyData.findIndex(p => 
+          p.timestamp.getTime() === point.timestamp.getTime()
+        );
+        const totalFlowValue = selectedFlowMeter.totalFlow * 
+          (totalIndex / selectedFlowMeter.historyData.length);
+        
+        return {
+          timestamp: point.timestamp,
+          name: point.timestamp.toLocaleString(),
+          value: totalFlowValue
+        };
+      });
     } else {
-      // For total flow, we need to calculate cumulative values
-      // Let's create a synthetic dataset based on totalFlow value
-      // We'll distribute the total evenly across the time points
-      const dataLength = selectedFlowMeter.historyData.length;
-      if (dataLength === 0) return [];
+      // For consumption (delta of totalFlow)
+      const result = [];
+      let previousTotalFlow = 0;
       
-      // Get even steps for visualization purposes
-      const step = selectedFlowMeter.totalFlow / dataLength;
+      for (let i = 0; i < filteredHistoryData.length; i++) {
+        const point = filteredHistoryData[i];
+        // For demo, we'll create a synthetic totalFlow that increases over time
+        const totalIndex = selectedFlowMeter.historyData.findIndex(p => 
+          p.timestamp.getTime() === point.timestamp.getTime()
+        );
+        const totalFlowValue = selectedFlowMeter.totalFlow * 
+          (totalIndex / selectedFlowMeter.historyData.length);
+        
+        const consumption = i === 0 ? 0 : totalFlowValue - previousTotalFlow;
+        previousTotalFlow = totalFlowValue;
+        
+        result.push({
+          timestamp: point.timestamp,
+          name: point.timestamp.toLocaleString(),
+          value: consumption
+        });
+      }
       
-      return selectedFlowMeter.historyData.map((point, index) => ({
-        timestamp: point.timestamp,
-        name: point.timestamp.toLocaleString(),
-        value: step * (index + 1) // Increasing value
-      }));
+      return result;
     }
-  }, [selectedFlowMeter, selectedTag]);
+  }, [selectedFlowMeter, selectedTag, filteredHistoryData]);
   
   // Get unit based on selected tag
   const getUnitForTag = useMemo(() => {
@@ -66,7 +140,7 @@ const TrendsPage: React.FC = () => {
     if (selectedTag === "flowRate") {
       return selectedFlowMeter.unit;
     } else {
-      // Convert unit for total flow
+      // Convert unit for total flow or consumption
       if (selectedFlowMeter.unit === "L/min") {
         return "L";
       } else if (selectedFlowMeter.unit === "m³/h") {
@@ -88,7 +162,20 @@ const TrendsPage: React.FC = () => {
   const getChartTitle = () => {
     if (!selectedFlowMeter) return "";
     
-    return `${selectedFlowMeter.name} - ${selectedTag === "flowRate" ? "Flow Rate" : "Total Flow"} Trend`;
+    let tagName = "";
+    switch(selectedTag) {
+      case "flowRate":
+        tagName = "Flow Rate";
+        break;
+      case "totalFlow":
+        tagName = "Total Flow";
+        break;
+      case "consumption":
+        tagName = "Consumption";
+        break;
+    }
+    
+    return `${selectedFlowMeter.name} - ${tagName} Trend`;
   };
   
   return (
@@ -161,6 +248,61 @@ const TrendsPage: React.FC = () => {
           
           <Card>
             <CardHeader>
+              <CardTitle className="text-lg">Time Range Selection</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <RadioGroup 
+                  value={timeRange} 
+                  onValueChange={(v) => handleTimeRangeChange(v as TimeRangeType)}
+                  className="flex space-x-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="last24h" id="last24h" />
+                    <Label htmlFor="last24h">Last 24 Hours</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="last7d" id="last7d" />
+                    <Label htmlFor="last7d">Last 7 Days</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="last30d" id="last30d" />
+                    <Label htmlFor="last30d">Last 30 Days</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="custom" id="custom" />
+                    <Label htmlFor="custom">Custom</Label>
+                  </div>
+                </RadioGroup>
+                
+                {timeRange === "custom" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="startDate">Start Date & Time</Label>
+                      <Input
+                        id="startDate"
+                        type="datetime-local"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endDate">End Date & Time</Label>
+                      <Input
+                        id="endDate"
+                        type="datetime-local"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
               <CardTitle className="text-lg">Select Tag to Display</CardTitle>
             </CardHeader>
             <CardContent>
@@ -176,6 +318,10 @@ const TrendsPage: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="totalFlow" id="totalFlow" />
                   <Label htmlFor="totalFlow">Total Flow</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="consumption" id="consumption" />
+                  <Label htmlFor="consumption">Consumption (Delta)</Label>
                 </div>
               </RadioGroup>
             </CardContent>
