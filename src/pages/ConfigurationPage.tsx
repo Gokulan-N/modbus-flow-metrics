@@ -10,7 +10,8 @@ import {
   XCircle, 
   ChevronsUpDown, 
   Link, 
-  Unlink 
+  Unlink,
+  Plus 
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFlowData, DeviceConfiguration } from "@/context/FlowDataContext";
@@ -19,6 +20,9 @@ import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { useForm } from "react-hook-form";
 
 // Mock configurations
 const mockDeviceConfigurations: DeviceConfiguration[] = [
@@ -82,11 +86,57 @@ const mockDeviceConfigurations: DeviceConfiguration[] = [
   }
 ];
 
+// New type for the form data
+type FlowMeterFormData = {
+  name: string;
+  ipAddress: string;
+  port: number;
+  slaveId: number;
+  protocol: "tcp" | "rtu" | "rtuovertcp";
+  pollRate: number;
+  flowMeterId: number;
+};
+
+type RegisterFormData = {
+  type: "flowRate" | "totalFlow";
+  address: number;
+  dataType: "int16" | "int32" | "float32" | "float64";
+  multiplier: number;
+  description: string;
+  deviceId: number;
+};
+
 const ConfigurationPage: React.FC = () => {
   const [configurations, setConfigurations] = useState<DeviceConfiguration[]>(mockDeviceConfigurations);
   const [expandedDevices, setExpandedDevices] = useState<number[]>([]);
+  const [openFlowMeterDialog, setOpenFlowMeterDialog] = useState(false);
+  const [openRegisterDialog, setOpenRegisterDialog] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<number | null>(null);
   const { toast } = useToast();
   const { connectFlowMeter, disconnectFlowMeter, connectedIds, connectAll, disconnectAll } = useFlowData();
+  
+  const flowMeterForm = useForm<FlowMeterFormData>({
+    defaultValues: {
+      name: "New Flow Meter",
+      ipAddress: "192.168.1.100",
+      port: 502,
+      slaveId: 1,
+      protocol: "tcp",
+      pollRate: 5000,
+      flowMeterId: configurations.length + 1
+    }
+  });
+
+  const registerForm = useForm<RegisterFormData>({
+    defaultValues: {
+      type: "flowRate",
+      address: 3000,
+      dataType: "float32",
+      multiplier: 1,
+      description: "New Register",
+      deviceId: 0
+    }
+  });
   
   const toggleDeviceExpanded = (deviceId: number) => {
     setExpandedDevices(prev => 
@@ -134,6 +184,57 @@ const ConfigurationPage: React.FC = () => {
     });
   };
   
+  const addNewFlowMeter = (data: FlowMeterFormData) => {
+    const newId = Math.max(...configurations.map(c => c.id!)) + 1;
+    const newDevice: DeviceConfiguration = {
+      id: newId,
+      name: data.name,
+      ipAddress: data.ipAddress,
+      port: data.port,
+      slaveId: data.slaveId,
+      protocol: data.protocol,
+      enabled: false,
+      pollRate: data.pollRate,
+      flowMeterId: data.flowMeterId,
+      registers: []
+    };
+    
+    setConfigurations([...configurations, newDevice]);
+    setOpenFlowMeterDialog(false);
+    
+    toast({
+      title: "Flow Meter Added",
+      description: `Flow meter "${data.name}" has been added successfully`,
+    });
+  };
+  
+  const addNewRegister = (data: RegisterFormData) => {
+    const newRegisterId = Math.max(...configurations.flatMap(c => c.registers?.map(r => r.id!) ?? [0])) + 1;
+    
+    const newRegister = {
+      id: newRegisterId,
+      type: data.type,
+      address: data.address,
+      dataType: data.dataType,
+      multiplier: data.multiplier,
+      description: data.description
+    };
+    
+    setConfigurations(devices => 
+      devices.map(device => 
+        device.id === data.deviceId 
+          ? { ...device, registers: [...(device.registers || []), newRegister] }
+          : device
+      )
+    );
+    setOpenRegisterDialog(false);
+    
+    toast({
+      title: "Register Added",
+      description: `Register "${data.description}" has been added successfully to device ${data.deviceId}`,
+    });
+  };
+  
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Configuration</h2>
@@ -165,6 +266,10 @@ const ConfigurationPage: React.FC = () => {
               >
                 <Unlink className="h-4 w-4" />
                 Disconnect All
+              </Button>
+              <Button variant="default" onClick={() => setOpenFlowMeterDialog(true)} className="flex items-center gap-1">
+                <Plus className="h-4 w-4" />
+                Add Flow Meter
               </Button>
               <Button onClick={saveConfiguration} className="flex items-center gap-1">
                 <Settings className="h-4 w-4" />
@@ -266,7 +371,25 @@ const ConfigurationPage: React.FC = () => {
                       </div>
                       
                       <div className="mt-4">
-                        <h4 className="font-medium mb-2">Register Configuration</h4>
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-medium">Register Configuration</h4>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="flex items-center gap-1"
+                            onClick={() => {
+                              registerForm.reset({
+                                ...registerForm.getValues(),
+                                deviceId: device.id!
+                              });
+                              setSelectedDeviceId(device.id!);
+                              setOpenRegisterDialog(true);
+                            }}
+                          >
+                            <Plus className="h-3 w-3" />
+                            Add Register
+                          </Button>
+                        </div>
                         <div className="border rounded-md p-2 space-y-4">
                           {device.registers && device.registers.map(register => (
                             <div key={register.id} className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -300,8 +423,21 @@ const ConfigurationPage: React.FC = () => {
                                   </SelectContent>
                                 </Select>
                               </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Multiplier</Label>
+                                <Input type="number" value={register.multiplier} onChange={() => {}} />
+                              </div>
+                              <div className="space-y-1 md:col-span-2">
+                                <Label className="text-xs">Description</Label>
+                                <Input value={register.description || ""} onChange={() => {}} />
+                              </div>
                             </div>
                           ))}
+                          {(!device.registers || device.registers.length === 0) && (
+                            <div className="text-center text-muted-foreground py-4">
+                              No registers configured. Click "Add Register" to add one.
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -317,6 +453,254 @@ const ConfigurationPage: React.FC = () => {
               </Card>
             ))}
           </div>
+          
+          {/* Dialog for adding new flow meter */}
+          <Dialog open={openFlowMeterDialog} onOpenChange={setOpenFlowMeterDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Flow Meter</DialogTitle>
+                <DialogDescription>
+                  Configure the settings for the new flow meter device
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Form {...flowMeterForm}>
+                <form onSubmit={flowMeterForm.handleSubmit(addNewFlowMeter)} className="space-y-4">
+                  <FormField
+                    control={flowMeterForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Device Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={flowMeterForm.control}
+                      name="ipAddress"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IP Address</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={flowMeterForm.control}
+                      name="port"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Port</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={flowMeterForm.control}
+                      name="slaveId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Slave ID</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={flowMeterForm.control}
+                      name="protocol"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Protocol</FormLabel>
+                          <Select 
+                            defaultValue={field.value} 
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Protocol" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="tcp">TCP</SelectItem>
+                              <SelectItem value="rtu">RTU</SelectItem>
+                              <SelectItem value="rtuovertcp">RTU over TCP</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={flowMeterForm.control}
+                      name="pollRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Poll Rate (ms)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={flowMeterForm.control}
+                      name="flowMeterId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Flow Meter ID</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <DialogFooter>
+                    <Button type="submit">Add Flow Meter</Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+          
+          {/* Dialog for adding new register */}
+          <Dialog open={openRegisterDialog} onOpenChange={setOpenRegisterDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Register</DialogTitle>
+                <DialogDescription>
+                  Configure the new register for the selected device
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Form {...registerForm}>
+                <form onSubmit={registerForm.handleSubmit(addNewRegister)} className="space-y-4">
+                  <FormField
+                    control={registerForm.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Register Type</FormLabel>
+                        <Select 
+                          defaultValue={field.value} 
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="flowRate">Flow Rate</SelectItem>
+                            <SelectItem value="totalFlow">Total Flow</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={registerForm.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Register Address</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="dataType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data Type</FormLabel>
+                          <Select 
+                            defaultValue={field.value} 
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Data Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="int16">INT16</SelectItem>
+                              <SelectItem value="int32">INT32</SelectItem>
+                              <SelectItem value="float32">FLOAT32</SelectItem>
+                              <SelectItem value="float64">FLOAT64</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={registerForm.control}
+                      name="multiplier"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Multiplier</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Input {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={registerForm.control}
+                    name="deviceId"
+                    render={({ field }) => (
+                      <FormItem className="hidden">
+                        <FormControl>
+                          <Input type="hidden" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <DialogFooter>
+                    <Button type="submit">Add Register</Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
         
         <TabsContent value="system">

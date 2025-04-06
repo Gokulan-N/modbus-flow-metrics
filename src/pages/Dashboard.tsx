@@ -53,38 +53,9 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
       
-      {/* Today's Consumption Overview */}
-      {hasActiveConnections && !isLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-          {flowMeters.map(flowMeter => {
-            const consumption = getTodayConsumption(flowMeter.id);
-            return (
-              <Card key={`consumption-${flowMeter.id}`} className="border-l-4 border-l-primary">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">{flowMeter.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="text-2xl font-bold">
-                        {consumption.toFixed(1)} {getConsumptionUnit(flowMeter.unit)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Consumption Today ({format(new Date(), "MMM d")})
-                      </div>
-                    </div>
-                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <TrendingUp className="h-4 w-4 text-primary" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-      
-      {!hasActiveConnections && !isLoading ? (
+      {hasActiveConnections && !isLoading ? (
+        <FlowMeterGrid />
+      ) : (
         <div className="flex flex-col items-center justify-center p-12 text-center">
           <div className="text-xl font-medium mb-2">Not Connected to Modbus Server</div>
           <p className="text-muted-foreground mb-6">
@@ -97,8 +68,6 @@ const Dashboard: React.FC = () => {
             Go to Configuration
           </Button>
         </div>
-      ) : (
-        <FlowMeterGrid />
       )}
     </div>
   );
