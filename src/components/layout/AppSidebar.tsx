@@ -14,12 +14,23 @@ import {
 import { BarChart3, Bell, FileText, Settings } from "lucide-react";
 import { useFlowData } from "@/context/FlowDataContext";
 import { cn } from "@/lib/utils";
+import { NavLink, useLocation } from "react-router-dom";
 
 export const AppSidebar: React.FC = () => {
   const { connectedIds } = useFlowData();
+  const location = useLocation();
   
   const hasActiveConnections = connectedIds.length > 0;
   
+  // Define navigation items with paths
+  const navItems = [
+    { icon: BarChart3, label: "Dashboard", path: "/" },
+    { icon: BarChart3, label: "Trends", path: "/trends" },
+    { icon: Bell, label: "Alarms", path: "/alarms" },
+    { icon: FileText, label: "Reports", path: "/reports" },
+    { icon: Settings, label: "Configuration", path: "/configuration" }
+  ];
+
   return (
     <Sidebar
       style={{
@@ -40,46 +51,22 @@ export const AppSidebar: React.FC = () => {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    <span>Dashboard</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    <span>Trends</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-5 w-5" />
-                    <span>Alarms</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    <span>Reports</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton>
-                  <div className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    <span>Configuration</span>
-                  </div>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.label}>
+                  <SidebarMenuButton asChild>
+                    <NavLink 
+                      to={item.path} 
+                      className={({ isActive }) => cn(
+                        "flex items-center gap-2 w-full",
+                        isActive ? "text-primary" : ""
+                      )}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.label}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
