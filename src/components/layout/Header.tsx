@@ -14,7 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
 const Header: React.FC = () => {
-  const { isMobile } = useIsMobile();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { logout, isAuthenticated } = useAuth();
   

@@ -14,6 +14,7 @@ export type AuthContextProps = {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   user: User | null;
+  userRole: string;
 };
 
 const AuthContext = createContext<AuthContextProps>({
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextProps>({
   login: async () => false,
   logout: () => {},
   user: null,
+  userRole: "",
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -84,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         user,
+        userRole: user?.role || "",
       }}
     >
       {children}
