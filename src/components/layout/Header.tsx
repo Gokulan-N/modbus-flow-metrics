@@ -48,7 +48,7 @@ const Header: React.FC = () => {
               </SheetContent>
             </Sheet>
           )}
-          <a href="/" className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2">
             <div className={cn(
               "hidden items-center h-8 w-8 overflow-hidden rounded-md bg-primary mr-1",
               isMobile ? "hidden" : "flex"
@@ -61,7 +61,7 @@ const Header: React.FC = () => {
             )}>
               FlexiFlow
             </span>
-          </a>
+          </div>
         </div>
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">

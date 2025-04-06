@@ -10,7 +10,13 @@ const AppLayout: React.FC = () => {
   const isMobile = useIsMobile();
   
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      defaultOpen={true}
+      style={{
+        "--sidebar-width": "14rem",
+        "--sidebar-width-icon": "3rem",
+      } as React.CSSProperties}
+    >
       <div className="min-h-screen flex w-full">
         {!isMobile && <AppSidebar />}
         <div className="flex-1 flex flex-col overflow-hidden">

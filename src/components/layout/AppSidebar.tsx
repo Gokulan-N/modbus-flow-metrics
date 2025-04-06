@@ -1,19 +1,17 @@
 
 import React from "react";
-import { NavLink } from "react-router-dom";
 import { 
   Sidebar, 
   SidebarContent, 
   SidebarGroup, 
   SidebarGroupContent,
   SidebarGroupLabel, 
-  SidebarHeader, 
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton, 
-  SidebarMenuItem, 
-  SidebarTrigger 
+  SidebarMenuItem 
 } from "@/components/ui/sidebar";
-import { FileText, BarChart3, Settings, Database, Bell } from "lucide-react";
+import { BarChart3, Bell, FileText, Settings } from "lucide-react";
 import { useFlowData } from "@/context/FlowDataContext";
 import { cn } from "@/lib/utils";
 
@@ -23,14 +21,18 @@ export const AppSidebar: React.FC = () => {
   const hasActiveConnections = connectedIds.length > 0;
   
   return (
-    <Sidebar>
-      <SidebarHeader className="flex items-center h-16 px-6">
-        <SidebarTrigger />
+    <Sidebar
+      style={{
+        "--sidebar-width": "14rem",
+        "--sidebar-width-icon": "3rem",
+      } as React.CSSProperties}
+    >
+      <SidebarHeader className="flex items-center h-16 px-4">
         <div className="flex items-center">
           <div className="flex items-center h-8 w-8 overflow-hidden rounded-md bg-primary mr-2">
             <span className="font-bold text-white text-lg w-full text-center">F</span>
           </div>
-          <div className="ml-2 font-semibold text-xl">FlexiFlow</div>
+          <div className="ml-2 font-semibold text-lg">FlexiFlow</div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -39,68 +41,43 @@ export const AppSidebar: React.FC = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/"
-                    className={({ isActive }) => 
-                      cn("flex items-center gap-2", isActive ? "text-sidebar-primary" : "")
-                    }
-                  >
+                <SidebarMenuButton>
+                  <div className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
                     <span>Dashboard</span>
-                  </NavLink>
+                  </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/trends"
-                    className={({ isActive }) => 
-                      cn("flex items-center gap-2", isActive ? "text-sidebar-primary" : "")
-                    }
-                  >
+                <SidebarMenuButton>
+                  <div className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
                     <span>Trends</span>
-                  </NavLink>
+                  </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/alarms"
-                    className={({ isActive }) => 
-                      cn("flex items-center gap-2", isActive ? "text-sidebar-primary" : "")
-                    }
-                  >
+                <SidebarMenuButton>
+                  <div className="flex items-center gap-2">
                     <Bell className="h-5 w-5" />
                     <span>Alarms</span>
-                  </NavLink>
+                  </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/reports"
-                    className={({ isActive }) => 
-                      cn("flex items-center gap-2", isActive ? "text-sidebar-primary" : "")
-                    }
-                  >
+                <SidebarMenuButton>
+                  <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
                     <span>Reports</span>
-                  </NavLink>
+                  </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink
-                    to="/configuration"
-                    className={({ isActive }) => 
-                      cn("flex items-center gap-2", isActive ? "text-sidebar-primary" : "")
-                    }
-                  >
+                <SidebarMenuButton>
+                  <div className="flex items-center gap-2">
                     <Settings className="h-5 w-5" />
                     <span>Configuration</span>
-                  </NavLink>
+                  </div>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
