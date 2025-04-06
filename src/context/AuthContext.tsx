@@ -29,11 +29,21 @@ const AuthContext = createContext<AuthContextProps>({
 export const useAuth = () => useContext(AuthContext);
 
 // Mock user data
-const MOCK_USER: User = {
-  id: "1",
-  username: "admin",
-  email: "admin@example.com",
-  role: "admin",
+const MOCK_USERS = {
+  admin: {
+    id: "1",
+    username: "admin",
+    email: "admin@example.com",
+    role: "admin" as const,
+    password: "admin123"
+  },
+  client: {
+    id: "2",
+    username: "client",
+    email: "client@example.com",
+    role: "viewer" as const,
+    password: "client123"
+  }
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -59,12 +69,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // In a real app, this would be an API call
+    // Check against our mock users
     return new Promise((resolve) => {
       setTimeout(() => {
-        if (username === "admin" && password === "password") {
-          setUser(MOCK_USER);
-          localStorage.setItem("user", JSON.stringify(MOCK_USER));
+        // Check if username exists in our mock data
+        const lowerUsername = username.toLowerCase();
+        if (
+          (lowerUsername === "admin" && password === MOCK_USERS.admin.password) || 
+          (lowerUsername === "client" && password === MOCK_USERS.client.password)
+        ) {
+          const userData = lowerUsername === "admin" ? 
+            MOCK_USERS.admin : 
+            MOCK_USERS.client;
+          
+          // Remove password before storing
+          const { password: _, ...userToStore } = userData;
+          
+          setUser(userToStore);
+          localStorage.setItem("user", JSON.stringify(userToStore));
           resolve(true);
         } else {
           resolve(false);

@@ -7,20 +7,42 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, UserCog } from "lucide-react";
+import { User, UserCog, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"client" | "admin">("client");
+  const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await login(username, password);
-    if (success) {
-      navigate("/");
+    setIsLoading(true);
+    
+    try {
+      const success = await login(username, password);
+      
+      if (success) {
+        navigate("/");
+      } else {
+        toast({
+          title: "Login Failed",
+          description: "Invalid username or password. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Login Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -56,6 +78,7 @@ const LoginPage: React.FC = () => {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Enter your username"
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -67,9 +90,12 @@ const LoginPage: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     required
+                    disabled={isLoading}
                   />
                 </div>
-                <Button type="submit" className="w-full">Sign in as Client</Button>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Signing in..." : "Sign in as Client"}
+                </Button>
               </form>
             </TabsContent>
             
@@ -83,6 +109,7 @@ const LoginPage: React.FC = () => {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Enter admin username"
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
@@ -94,9 +121,12 @@ const LoginPage: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter admin password"
                     required
+                    disabled={isLoading}
                   />
                 </div>
-                <Button type="submit" className="w-full">Sign in as Admin</Button>
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  {isLoading ? "Signing in..." : "Sign in as Admin"}
+                </Button>
               </form>
             </TabsContent>
           </Tabs>
