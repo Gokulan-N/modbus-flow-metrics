@@ -5,9 +5,7 @@ import { useFlowData } from "@/context/FlowDataContext";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, startOfDay } from "date-fns";
-import { TrendingUp } from "lucide-react";
 
 const Dashboard: React.FC = () => {
   const { connectedIds, isLoading, flowMeters } = useFlowData();
@@ -35,7 +33,7 @@ const Dashboard: React.FC = () => {
   
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h2 className="text-2xl font-bold">Flow Meters Dashboard</h2>
         <div className="flex gap-2 items-center">
           <Badge 
@@ -47,6 +45,7 @@ const Dashboard: React.FC = () => {
           <Button
             variant="outline"
             onClick={() => navigate("/trends")}
+            size="sm"
           >
             View Trends
           </Button>

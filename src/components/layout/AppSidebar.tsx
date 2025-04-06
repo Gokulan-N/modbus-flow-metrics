@@ -26,7 +26,12 @@ export const AppSidebar: React.FC = () => {
     <Sidebar>
       <SidebarHeader className="flex items-center h-16 px-6">
         <SidebarTrigger />
-        <div className="ml-2 font-semibold text-xl">ModbusLogger</div>
+        <div className="flex items-center">
+          <div className="flex items-center h-8 w-8 overflow-hidden rounded-md bg-primary mr-2">
+            <span className="font-bold text-white text-lg w-full text-center">F</span>
+          </div>
+          <div className="ml-2 font-semibold text-xl">FlexiFlow</div>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
