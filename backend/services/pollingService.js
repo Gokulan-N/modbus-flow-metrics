@@ -1,4 +1,3 @@
-
 const ModbusRTU = require('modbus-serial');
 const { db, getCurrentDbType } = require('../models/db');
 const { 
@@ -11,10 +10,12 @@ let isPolling = false;
 let pollingIntervals = {};
 let modbusClients = {};
 let webSocketServer = null;
+let autoReconnect = true;
 
 // Initialize the polling service
-const setupPollingService = (wss) => {
+const setupPollingService = (wss, enableAutoReconnect = false) => {
   webSocketServer = wss;
+  autoReconnect = enableAutoReconnect;
   startPollingService();
   
   // Restart polling every hour to prevent any potential memory issues
@@ -49,6 +50,8 @@ const startPollingService = async () => {
     for (const device of devices) {
       await setupDevicePolling(device);
     }
+    
+    logger.info(`Polling service started with ${devices.length} devices`);
   } catch (err) {
     logger.error('Error starting polling service:', err);
     isPolling = false;
@@ -168,32 +171,73 @@ const setupDevicePolling = async (device) => {
     // Create Modbus client
     const client = new ModbusRTU();
     
-    // Connect based on protocol
-    switch (device.protocol.toLowerCase()) {
-      case 'tcp':
-        await client.connectTCP(device.ip_address, { port: device.port });
-        break;
-      case 'rtu':
-        // In real implementation, this would connect to a serial port
-        logger.warn('RTU protocol not fully implemented in this demo');
-        return;
-      case 'rtuovertcp':
-        await client.connectTcpRTUBuffered(device.ip_address, { port: device.port });
-        break;
-      default:
-        logger.error(`Unsupported protocol: ${device.protocol}`);
-        return;
-    }
+    // Function to connect to the device
+    const connectToDevice = async () => {
+      try {
+        // Connect based on protocol
+        switch (device.protocol.toLowerCase()) {
+          case 'tcp':
+            await client.connectTCP(device.ip_address, { port: device.port });
+            break;
+          case 'rtu':
+            // In real implementation, this would connect to a serial port
+            logger.warn('RTU protocol not fully implemented in this demo');
+            return false;
+          case 'rtuovertcp':
+            await client.connectTcpRTUBuffered(device.ip_address, { port: device.port });
+            break;
+          default:
+            logger.error(`Unsupported protocol: ${device.protocol}`);
+            return false;
+        }
+        
+        // Set the slave ID (unit ID)
+        client.setID(device.slave_id);
+        logger.info(`Connected to device ${device.id} (${device.name})`);
+        return true;
+      } catch (err) {
+        logger.error(`Error connecting to device ${device.id}:`, err);
+        return false;
+      }
+    };
     
-    // Set the slave ID (unit ID)
-    client.setID(device.slave_id);
+    // Try to connect initially
+    const connected = await connectToDevice();
+    if (!connected) {
+      logger.warn(`Failed to connect to device ${device.id}. Will retry on next poll.`);
+    }
     
     // Store the client
     modbusClients[device.id] = client;
     
-    // Setup polling interval
+    // Setup polling interval with auto-reconnect capability
     pollingIntervals[device.id] = setInterval(async () => {
-      await pollDevice(device, registers, client);
+      try {
+        if (!client.isOpen) {
+          if (autoReconnect) {
+            logger.info(`Attempting to reconnect to device ${device.id}...`);
+            await connectToDevice();
+          } else {
+            logger.warn(`Device ${device.id} connection is closed. Skipping poll.`);
+            return;
+          }
+        }
+        
+        // Poll the device if connected
+        if (client.isOpen) {
+          await pollDevice(device, registers, client);
+        }
+      } catch (err) {
+        logger.error(`Error during polling cycle for device ${device.id}:`, err);
+        // Close connection if there's an error, it will be reopened on next cycle
+        if (client.isOpen) {
+          try {
+            client.close();
+          } catch (closeErr) {
+            logger.error(`Error closing client for device ${device.id}:`, closeErr);
+          }
+        }
+      }
     }, device.poll_rate);
     
     logger.info(`Polling started for device ${device.id} (${device.name}) every ${device.poll_rate}ms`);
@@ -236,6 +280,7 @@ const pollDevice = async (device, registers, client) => {
     }
   } catch (err) {
     logger.error(`Error polling device ${device.id}:`, err);
+    throw err; // Rethrow to trigger reconnection process
   }
 };
 

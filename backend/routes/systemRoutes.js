@@ -14,4 +14,10 @@ router.put('/settings', isAdmin, systemController.updateSystemSettings);
 // Get system status
 router.get('/status', systemController.getSystemStatus);
 
+// Get log files
+router.get('/logs', systemController.getLogFiles);
+
+// Get log content
+router.get('/logs/:name', systemController.getLogContent);
+
 module.exports = router;

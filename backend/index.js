@@ -68,8 +68,8 @@ initializeDatabase()
     // Setup WebSocket for real-time updates
     handleWebSocketConnections(wss);
     
-    // Start polling service
-    setupPollingService(wss);
+    // Start polling service with auto-reconnect
+    setupPollingService(wss, true);
     
     // Initialize backup scheduler
     initializeBackupScheduler();

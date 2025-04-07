@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,9 @@ import {
   ChevronsUpDown, 
   Link, 
   Unlink,
-  Plus 
+  Plus,
+  Database,
+  FileText
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFlowData, DeviceConfiguration } from "@/context/FlowDataContext";
@@ -23,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
+import DatabaseSettings from "@/components/configuration/DatabaseSettings";
+import LogsViewer from "@/components/configuration/LogsViewer";
 
 // Mock configurations
 const mockDeviceConfigurations: DeviceConfiguration[] = [
@@ -241,8 +244,22 @@ const ConfigurationPage: React.FC = () => {
       
       <Tabs defaultValue="devices">
         <TabsList className="mb-4">
-          <TabsTrigger value="devices">Devices</TabsTrigger>
-          <TabsTrigger value="system">System Settings</TabsTrigger>
+          <TabsTrigger value="devices" className="flex items-center gap-1">
+            <Network className="h-4 w-4" />
+            Devices
+          </TabsTrigger>
+          <TabsTrigger value="system" className="flex items-center gap-1">
+            <Settings className="h-4 w-4" />
+            System Settings
+          </TabsTrigger>
+          <TabsTrigger value="database" className="flex items-center gap-1">
+            <Database className="h-4 w-4" />
+            Database
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="flex items-center gap-1">
+            <FileText className="h-4 w-4" />
+            Logs
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="devices">
@@ -454,7 +471,6 @@ const ConfigurationPage: React.FC = () => {
             ))}
           </div>
           
-          {/* Dialog for adding new flow meter */}
           <Dialog open={openFlowMeterDialog} onOpenChange={setOpenFlowMeterDialog}>
             <DialogContent>
               <DialogHeader>
@@ -581,7 +597,6 @@ const ConfigurationPage: React.FC = () => {
             </DialogContent>
           </Dialog>
           
-          {/* Dialog for adding new register */}
           <Dialog open={openRegisterDialog} onOpenChange={setOpenRegisterDialog}>
             <DialogContent>
               <DialogHeader>
@@ -757,6 +772,14 @@ const ConfigurationPage: React.FC = () => {
               </Button>
             </CardFooter>
           </Card>
+        </TabsContent>
+        
+        <TabsContent value="database">
+          <DatabaseSettings />
+        </TabsContent>
+        
+        <TabsContent value="logs">
+          <LogsViewer />
         </TabsContent>
       </Tabs>
     </div>
