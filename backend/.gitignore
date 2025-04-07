@@ -24,3 +24,16 @@ backups/
 # Windows service files
 daemon/
 
+# npm debug logs
+npm-debug.log*
+
+# Windows service logs
+*.out
+*.err
+
+# Test coverage
+coverage/
+
+# Build files
+dist/
+build/

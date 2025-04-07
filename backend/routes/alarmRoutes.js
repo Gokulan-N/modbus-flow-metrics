@@ -20,8 +20,8 @@ router.put('/:id', isAdmin, alarmController.updateAlarm);
 // Delete an alarm (admin only)
 router.delete('/:id', isAdmin, alarmController.deleteAlarm);
 
-// Acknowledge an alarm event
-router.post('/events/:eventId/acknowledge', alarmController.acknowledgeAlarmEvent);
+// Acknowledge an alarm event (admin only)
+router.post('/events/:eventId/acknowledge', isAdmin, alarmController.acknowledgeAlarmEvent);
 
 // Get alarm events
 router.get('/events', alarmController.getAlarmEvents);

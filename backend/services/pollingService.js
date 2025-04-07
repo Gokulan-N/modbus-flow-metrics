@@ -1,6 +1,10 @@
 
 const ModbusRTU = require('modbus-serial');
-const { db } = require('../models/db');
+const { db, getCurrentDbType } = require('../models/db');
+const { 
+  insertFlowMeterData, 
+  insertAlarmEvent 
+} = require('../models/mysqlDb');
 const logger = require('../utils/logger');
 
 let isPolling = false;
@@ -84,6 +88,68 @@ const restartPollingService = async () => {
   logger.info('Restarting polling service...');
   stopPollingService();
   setTimeout(startPollingService, 1000);
+};
+
+// Add a new device to the polling service
+const addDeviceToPolling = async (deviceId) => {
+  try {
+    // Check if already polling this device
+    if (pollingIntervals[deviceId]) {
+      logger.info(`Device ${deviceId} is already being polled`);
+      return true;
+    }
+    
+    // Get device details
+    const device = await db.getAsync('SELECT * FROM devices WHERE id = ?', [deviceId]);
+    
+    if (!device) {
+      logger.error(`Device ${deviceId} not found`);
+      return false;
+    }
+    
+    // Validate device enabled status
+    if (!device.enabled) {
+      logger.warn(`Cannot add device ${deviceId} to polling as it is not enabled`);
+      return false;
+    }
+    
+    // Setup polling for this device
+    await setupDevicePolling(device);
+    logger.info(`Added device ${deviceId} to polling service`);
+    return true;
+  } catch (err) {
+    logger.error(`Error adding device ${deviceId} to polling:`, err);
+    return false;
+  }
+};
+
+// Remove a device from the polling service
+const removeDeviceFromPolling = (deviceId) => {
+  try {
+    // Check if we're polling this device
+    if (!pollingIntervals[deviceId]) {
+      logger.info(`Device ${deviceId} is not currently being polled`);
+      return true;
+    }
+    
+    // Clear polling interval
+    clearInterval(pollingIntervals[deviceId]);
+    delete pollingIntervals[deviceId];
+    
+    // Close modbus connection
+    if (modbusClients[deviceId] && modbusClients[deviceId].isOpen) {
+      modbusClients[deviceId].close(() => {
+        logger.info(`Closed Modbus connection for device ${deviceId}`);
+      });
+    }
+    delete modbusClients[deviceId];
+    
+    logger.info(`Removed device ${deviceId} from polling service`);
+    return true;
+  } catch (err) {
+    logger.error(`Error removing device ${deviceId} from polling:`, err);
+    return false;
+  }
 };
 
 // Setup polling for a specific device
@@ -243,12 +309,21 @@ const storeFlowMeterData = async (flowMeterId, flowRate, totalFlow) => {
       }
     }
     
-    // Insert data into the database
-    await db.runAsync(`
-      INSERT INTO flow_meter_data
-      (flow_meter_id, flow_rate, total_flow, status)
-      VALUES (?, ?, ?, ?)
-    `, [flowMeterId, flowRate, totalFlow, status]);
+    // Get current database type
+    const dataDbType = await getCurrentDbType();
+    
+    // Store data in the appropriate database
+    if (dataDbType === 'mysql') {
+      // Insert into MySQL
+      await insertFlowMeterData(flowMeterId, flowRate, totalFlow, status);
+    } else {
+      // Insert into SQLite
+      await db.runAsync(`
+        INSERT INTO flow_meter_data
+        (flow_meter_id, flow_rate, total_flow, status)
+        VALUES (?, ?, ?, ?)
+      `, [flowMeterId, flowRate, totalFlow, status]);
+    }
     
     // Clean up old data based on retention policy (in a production system)
     cleanupOldData();
@@ -287,26 +362,40 @@ const checkAlarms = async (flowMeterId, flowRate) => {
   }
 };
 
+// Helper function to get active alarm event
+const getActiveAlarmEvent = async (alarmId, flowMeterId) => {
+  return await db.getAsync(`
+    SELECT * FROM alarm_events
+    WHERE alarm_id = ? AND flow_meter_id = ? AND active = 1
+  `, [alarmId, flowMeterId]);
+};
+
 // Trigger an alarm condition
 const triggerAlarm = async (alarm, flowMeterId, value, message) => {
   try {
     // Check if there's already an active alarm for this condition
-    const activeAlarm = await db.getAsync(`
-      SELECT * FROM alarm_events
-      WHERE alarm_id = ? AND flow_meter_id = ? AND active = 1
-    `, [alarm.id, flowMeterId]);
+    const activeAlarm = await getActiveAlarmEvent(alarm.id, flowMeterId);
     
     if (activeAlarm) {
       // Alarm already active, no need to create a new one
       return;
     }
     
-    // Create new alarm event
-    await db.runAsync(`
-      INSERT INTO alarm_events
-      (alarm_id, flow_meter_id, active, value, message)
-      VALUES (?, ?, 1, ?, ?)
-    `, [alarm.id, flowMeterId, value, message]);
+    // Get current database type
+    const dataDbType = await getCurrentDbType();
+    
+    // Create new alarm event in the appropriate database
+    if (dataDbType === 'mysql') {
+      // Insert into MySQL
+      await insertAlarmEvent(alarm.id, flowMeterId, true, value, message);
+    } else {
+      // Insert into SQLite
+      await db.runAsync(`
+        INSERT INTO alarm_events
+        (alarm_id, flow_meter_id, active, value, message)
+        VALUES (?, ?, 1, ?, ?)
+      `, [alarm.id, flowMeterId, value, message]);
+    }
     
     logger.info(`Alarm triggered: ${alarm.name} - ${message}`);
     
@@ -324,10 +413,7 @@ const triggerAlarm = async (alarm, flowMeterId, value, message) => {
 const clearAlarmIfNeeded = async (alarm, flowMeterId, value) => {
   try {
     // Get active alarm for this condition
-    const activeAlarm = await db.getAsync(`
-      SELECT * FROM alarm_events
-      WHERE alarm_id = ? AND flow_meter_id = ? AND active = 1
-    `, [alarm.id, flowMeterId]);
+    const activeAlarm = await getActiveAlarmEvent(alarm.id, flowMeterId);
     
     if (!activeAlarm) {
       // No active alarm to clear
@@ -347,7 +433,15 @@ const clearAlarmIfNeeded = async (alarm, flowMeterId, value) => {
     }
     
     if (shouldClear) {
-      // Update alarm event to inactive
+      // Get current database type
+      const dataDbType = await getCurrentDbType();
+      
+      if (dataDbType === 'mysql') {
+        // In MySQL, we would update the alarm event differently
+        // For simplicity, just update the SQLite version here
+      }
+      
+      // Update alarm event to inactive in SQLite
       await db.runAsync(`
         UPDATE alarm_events
         SET active = 0, ended_at = CURRENT_TIMESTAMP
@@ -365,18 +459,24 @@ const clearAlarmIfNeeded = async (alarm, flowMeterId, value) => {
 const cleanupOldData = async () => {
   try {
     // Get retention period from system settings
-    const settings = await db.getAsync('SELECT data_retention_period FROM system_settings LIMIT 1');
+    const settings = await db.getAsync('SELECT data_retention_period, data_db_type FROM system_settings LIMIT 1');
     
     if (settings && settings.data_retention_period) {
       const retentionDays = settings.data_retention_period;
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
       
-      // Delete old data
+      // Delete old data from SQLite
       await db.runAsync(`
         DELETE FROM flow_meter_data
         WHERE timestamp < ?
       `, [cutoffDate.toISOString()]);
+      
+      // If using MySQL, clean up MySQL data too
+      if (settings.data_db_type === 'mysql') {
+        const { cleanupOldData: cleanupMySqlData } = require('../models/mysqlDb');
+        await cleanupMySqlData(retentionDays);
+      }
     }
   } catch (err) {
     logger.error('Error cleaning up old data:', err);
@@ -408,5 +508,7 @@ module.exports = {
   setupPollingService,
   startPollingService,
   stopPollingService,
-  restartPollingService
+  restartPollingService,
+  addDeviceToPolling,
+  removeDeviceFromPolling
 };

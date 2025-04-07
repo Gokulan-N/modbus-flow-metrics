@@ -1,6 +1,37 @@
 
 const { db } = require('../models/db');
 const logger = require('../utils/logger');
+const { 
+  addDeviceToPolling, 
+  removeDeviceFromPolling 
+} = require('../services/pollingService');
+const net = require('net');
+
+// Function to validate IP address
+const isValidIpOrHostname = (address) => {
+  // Check if it's a valid IPv4 address
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  if (ipv4Regex.test(address)) {
+    const parts = address.split('.');
+    return parts.every(part => parseInt(part, 10) >= 0 && parseInt(part, 10) <= 255);
+  }
+  
+  // Check if it might be a hostname
+  const hostnameRegex = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+  return hostnameRegex.test(address);
+};
+
+// Function to validate port
+const isValidPort = (port) => {
+  const portNum = parseInt(port, 10);
+  return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
+};
+
+// Function to validate poll rate
+const isValidPollRate = (rate) => {
+  const rateNum = parseInt(rate, 10);
+  return !isNaN(rateNum) && rateNum >= 1000; // Minimum 1000ms (1 second)
+};
 
 // Get all devices
 exports.getAllDevices = async (req, res) => {
@@ -63,6 +94,26 @@ exports.createDevice = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
+    // Validate IP address or hostname
+    if (!isValidIpOrHostname(ipAddress)) {
+      return res.status(400).json({ error: 'Invalid IP address or hostname' });
+    }
+    
+    // Validate port
+    if (!isValidPort(port)) {
+      return res.status(400).json({ error: 'Invalid port number. Must be between 1 and 65535' });
+    }
+    
+    // Validate poll rate
+    if (!isValidPollRate(pollRate)) {
+      return res.status(400).json({ error: 'Invalid poll rate. Must be at least 1000ms' });
+    }
+
+    // Validate protocol
+    if (!['tcp', 'rtu', 'rtuovertcp'].includes(protocol.toLowerCase())) {
+      return res.status(400).json({ error: 'Invalid protocol. Must be one of: tcp, rtu, rtuovertcp' });
+    }
+    
     // Insert device
     const result = await db.runAsync(`
       INSERT INTO devices 
@@ -90,6 +141,11 @@ exports.createDevice = async (req, res) => {
     const device = await db.getAsync('SELECT * FROM devices WHERE id = ?', [deviceId]);
     const deviceRegisters = await db.allAsync('SELECT * FROM registers WHERE device_id = ?', [deviceId]);
     
+    // If device is enabled, start polling
+    if (enabled) {
+      await addDeviceToPolling(deviceId);
+    }
+    
     res.status(201).json({
       device,
       registers: deviceRegisters
@@ -116,9 +172,29 @@ exports.updateDevice = async (req, res) => {
     } = req.body;
     
     // Check if device exists
-    const existingDevice = await db.getAsync('SELECT id FROM devices WHERE id = ?', [deviceId]);
+    const existingDevice = await db.getAsync('SELECT id, enabled FROM devices WHERE id = ?', [deviceId]);
     if (!existingDevice) {
       return res.status(404).json({ error: 'Device not found' });
+    }
+    
+    // Validate IP address or hostname
+    if (!isValidIpOrHostname(ipAddress)) {
+      return res.status(400).json({ error: 'Invalid IP address or hostname' });
+    }
+    
+    // Validate port
+    if (!isValidPort(port)) {
+      return res.status(400).json({ error: 'Invalid port number. Must be between 1 and 65535' });
+    }
+    
+    // Validate poll rate
+    if (!isValidPollRate(pollRate)) {
+      return res.status(400).json({ error: 'Invalid poll rate. Must be at least 1000ms' });
+    }
+
+    // Validate protocol
+    if (!['tcp', 'rtu', 'rtuovertcp'].includes(protocol.toLowerCase())) {
+      return res.status(400).json({ error: 'Invalid protocol. Must be one of: tcp, rtu, rtuovertcp' });
     }
     
     // Update device
@@ -131,6 +207,17 @@ exports.updateDevice = async (req, res) => {
     
     // Get updated device
     const updatedDevice = await db.getAsync('SELECT * FROM devices WHERE id = ?', [deviceId]);
+    
+    // If device enabled status changed, update polling
+    if (existingDevice.enabled !== (enabled ? 1 : 0)) {
+      if (enabled) {
+        // Start polling if newly enabled
+        await addDeviceToPolling(deviceId);
+      } else {
+        // Stop polling if newly disabled
+        removeDeviceFromPolling(deviceId);
+      }
+    }
     
     res.json({ device: updatedDevice });
   } catch (err) {
@@ -149,6 +236,9 @@ exports.deleteDevice = async (req, res) => {
     if (!existingDevice) {
       return res.status(404).json({ error: 'Device not found' });
     }
+    
+    // Stop polling if device is being polled
+    removeDeviceFromPolling(deviceId);
     
     // Delete device (registers will be deleted via CASCADE)
     await db.runAsync('DELETE FROM devices WHERE id = ?', [deviceId]);
@@ -266,6 +356,12 @@ exports.connectDevice = async (req, res) => {
       [deviceId]
     );
     
+    // Start polling immediately
+    const success = await addDeviceToPolling(deviceId);
+    if (!success) {
+      return res.status(500).json({ error: 'Failed to start polling for device' });
+    }
+    
     res.json({ 
       message: 'Device connected successfully',
       deviceId: device.id,
@@ -293,6 +389,9 @@ exports.disconnectDevice = async (req, res) => {
       'UPDATE devices SET enabled = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
       [deviceId]
     );
+    
+    // Stop polling immediately
+    removeDeviceFromPolling(deviceId);
     
     res.json({ 
       message: 'Device disconnected successfully',

@@ -149,6 +149,7 @@ const createTables = async () => {
       alarm_notification_email TEXT,
       backup_schedule TEXT DEFAULT 'daily',
       auto_update BOOLEAN DEFAULT 1,
+      data_db_type TEXT DEFAULT 'sqlite',
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -192,9 +193,9 @@ const createDefaultSystemSettings = async () => {
     if (!settings) {
       await db.runAsync(`
         INSERT INTO system_settings 
-        (data_logging_interval, data_retention_period, alarm_notification_email, backup_schedule, auto_update) 
-        VALUES (?, ?, ?, ?, ?)`,
-        [15, 90, 'admin@example.com', 'daily', 1]
+        (data_logging_interval, data_retention_period, alarm_notification_email, backup_schedule, auto_update, data_db_type) 
+        VALUES (?, ?, ?, ?, ?, ?)`,
+        [15, 90, 'admin@example.com', 'daily', 1, 'sqlite']
       );
       
       logger.info('Default system settings created');
@@ -204,7 +205,19 @@ const createDefaultSystemSettings = async () => {
   }
 };
 
+// Helper function to get current database type setting
+const getCurrentDbType = async () => {
+  try {
+    const settings = await db.getAsync('SELECT data_db_type FROM system_settings LIMIT 1');
+    return settings && settings.data_db_type ? settings.data_db_type : 'sqlite';
+  } catch (err) {
+    logger.error('Error getting current database type:', err);
+    return 'sqlite'; // Default to SQLite if error
+  }
+};
+
 module.exports = {
   db,
-  initializeDatabase
+  initializeDatabase,
+  getCurrentDbType
 };

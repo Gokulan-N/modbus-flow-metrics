@@ -7,7 +7,8 @@ const bodyParser = require('body-parser');
 const WebSocket = require('ws');
 const http = require('http');
 const { initializeDatabase } = require('./models/db');
-const { setupPollingService } = require('./services/pollingService');
+const { initializeMySql, closeMySql } = require('./models/mysqlDb');
+const { setupPollingService, stopPollingService } = require('./services/pollingService');
 const { initializeBackupScheduler } = require('./services/backupService');
 const authRoutes = require('./routes/authRoutes');
 const deviceRoutes = require('./routes/deviceRoutes');
@@ -20,6 +21,7 @@ const { authenticateToken } = require('./middleware/auth');
 const { handleWebSocketConnections } = require('./services/websocketService');
 const path = require('path');
 const fs = require('fs');
+const logger = require('./utils/logger');
 
 const app = express();
 const server = http.createServer(app);
@@ -57,8 +59,12 @@ app.get('/health', (req, res) => {
 // Initialize database
 initializeDatabase()
   .then(() => {
-    console.log('Database initialized successfully');
+    logger.info('SQLite database initialized successfully');
     
+    // Try to initialize MySQL if configured
+    return initializeMySql();
+  })
+  .then(() => {
     // Setup WebSocket for real-time updates
     handleWebSocketConnections(wss);
     
@@ -70,17 +76,33 @@ initializeDatabase()
     
     const PORT = process.env.PORT || 3000;
     server.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+      logger.info(`Server is running on port ${PORT}`);
     });
   })
   .catch(err => {
-    console.error('Failed to initialize database:', err);
+    logger.error('Failed to initialize database:', err);
     process.exit(1);
   });
 
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  console.log('Shutting down gracefully...');
-  // Close database connections, stop polling, etc.
-  process.exit(0);
-});
+// Handle graceful shutdown for both SIGINT and SIGTERM
+const gracefulShutdown = async () => {
+  logger.info('Shutting down gracefully...');
+  
+  // Stop polling
+  stopPollingService();
+  
+  // Close MySQL connection if using it
+  await closeMySql();
+  
+  // Wait a moment for connections to close
+  setTimeout(() => {
+    logger.info('Shutdown complete');
+    process.exit(0);
+  }, 1000);
+};
+
+// Handle SIGINT (Ctrl+C)
+process.on('SIGINT', gracefulShutdown);
+
+// Handle SIGTERM (service stop)
+process.on('SIGTERM', gracefulShutdown);
