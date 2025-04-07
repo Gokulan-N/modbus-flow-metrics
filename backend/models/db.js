@@ -21,7 +21,7 @@ db.execAsync = promisify(db.exec.bind(db));
 const initializeDatabase = async () => {
   try {
     await createTables();
-    await createDefaultAdminUser();
+    await createDefaultUsers();
     await createDefaultSystemSettings();
     return true;
   } catch (err) {
@@ -37,7 +37,7 @@ const createTables = async () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
-      role TEXT DEFAULT 'user',
+      role TEXT DEFAULT 'viewer',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -156,23 +156,32 @@ const createTables = async () => {
   logger.info('Database tables created successfully');
 };
 
-const createDefaultAdminUser = async () => {
+const createDefaultUsers = async () => {
   const bcrypt = require('bcrypt');
-  const hashedPassword = await bcrypt.hash('admin123', 10);
   
   try {
-    const user = await db.getAsync('SELECT id FROM users WHERE username = ?', ['admin']);
+    // Check if any users exist
+    const userCount = await db.getAsync('SELECT COUNT(*) as count FROM users');
     
-    if (!user) {
+    if (userCount.count === 0) {
+      // Create admin user
+      const adminPassword = await bcrypt.hash('admin123', 10);
       await db.runAsync(
         'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-        ['admin', hashedPassword, 'admin']
+        ['admin', adminPassword, 'admin']
       );
       
-      logger.info('Default admin user created');
+      // Create viewer user
+      const viewerPassword = await bcrypt.hash('viewer123', 10);
+      await db.runAsync(
+        'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+        ['viewer', viewerPassword, 'viewer']
+      );
+      
+      logger.info('Default users created (admin/viewer)');
     }
   } catch (err) {
-    logger.error('Error creating default admin user:', err);
+    logger.error('Error creating default users:', err);
   }
 };
 

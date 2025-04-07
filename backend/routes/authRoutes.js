@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { db } = require('../models/db');
 const logger = require('../utils/logger');
+const { isAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -70,6 +71,83 @@ router.get('/me', async (req, res) => {
     }
     
     logger.error('Auth error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create new user (admin only)
+router.post('/users', isAdmin, async (req, res) => {
+  try {
+    const { username, password, role } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    // Validate role
+    if (role !== 'admin' && role !== 'viewer') {
+      return res.status(400).json({ error: 'Invalid role. Must be "admin" or "viewer"' });
+    }
+    
+    // Check if username already exists
+    const existingUser = await db.getAsync('SELECT id FROM users WHERE username = ?', [username]);
+    if (existingUser) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Insert new user
+    const result = await db.runAsync(
+      'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+      [username, hashedPassword, role]
+    );
+    
+    res.status(201).json({
+      user: {
+        id: result.lastID,
+        username,
+        role
+      }
+    });
+  } catch (err) {
+    logger.error('Error creating user:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get all users (admin only)
+router.get('/users', isAdmin, async (req, res) => {
+  try {
+    const users = await db.allAsync('SELECT id, username, role, created_at FROM users');
+    res.json({ users });
+  } catch (err) {
+    logger.error('Error getting users:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete a user (admin only)
+router.delete('/users/:id', isAdmin, async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // Don't allow deleting yourself
+    if (userId == req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    
+    const user = await db.getAsync('SELECT id FROM users WHERE id = ?', [userId]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    await db.runAsync('DELETE FROM users WHERE id = ?', [userId]);
+    
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    logger.error(`Error deleting user ${req.params.id}:`, err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

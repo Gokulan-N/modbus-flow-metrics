@@ -13,9 +13,13 @@ logs
 *.sqlite3
 *.db
 
-# Reports
+# Reports and backups
 reports/
+backups/
 
 # IDE files
 .vscode
 .idea
+
+# Windows service files
+daemon/

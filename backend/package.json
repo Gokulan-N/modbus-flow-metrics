@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install-service": "node scripts/install-windows-service.js",
+    "uninstall-service": "node scripts/uninstall-windows-service.js",
+    "backup": "node scripts/manual-backup.js"
   },
   "author": "",
   "license": "ISC",
@@ -20,6 +23,7 @@
     "jsonwebtoken": "^9.0.2",
     "modbus-serial": "^8.0.16",
     "morgan": "^1.10.0",
+    "node-windows": "^1.0.0-beta.8",
     "sqlite3": "^5.1.7",
     "winston": "^3.11.0",
     "ws": "^8.16.0"

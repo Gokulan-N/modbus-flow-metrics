@@ -28,7 +28,16 @@ const isAdmin = (req, res, next) => {
   }
 };
 
+const isAdminOrViewer = (req, res, next) => {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'viewer')) {
+    next();
+  } else {
+    res.status(403).json({ error: 'Access denied. Valid role required.' });
+  }
+};
+
 module.exports = {
   authenticateToken,
-  isAdmin
+  isAdmin,
+  isAdminOrViewer
 };
