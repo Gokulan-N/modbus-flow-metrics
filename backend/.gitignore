@@ -1,0 +1,21 @@
+
+# Node modules
+node_modules
+
+# Environment variables
+.env
+
+# Logs
+logs
+*.log
+
+# Database
+*.sqlite3
+*.db
+
+# Reports
+reports/
+
+# IDE files
+.vscode
+.idea

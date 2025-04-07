@@ -1,73 +1,104 @@
-# Welcome to your Lovable project
 
-## Project info
+# FlexiFlow Monitoring System
 
-**URL**: https://lovable.dev/projects/3c05b29a-ed2e-40a3-aad2-adffb09a590d
+A comprehensive flow meter monitoring system with local backend and frontend components.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- Real-time monitoring of flow meter devices via Modbus
+- Interactive dashboard with meter status and readings
+- Historical trend analysis
+- Alarms and notifications
+- Report generation
+- Device configuration and management
+- WebSocket support for live updates
 
-**Use Lovable**
+## Project Structure
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/3c05b29a-ed2e-40a3-aad2-adffb09a590d) and start prompting.
+```
+project-root/
+├── backend/             # Node.js and Express backend
+│   ├── routes/          # API routes
+│   ├── controllers/     # Business logic
+│   ├── services/        # Services for Modbus, etc.
+│   ├── models/          # Database models
+│   ├── db.sqlite3       # SQLite database
+│   └── index.js         # Entry point
+├── frontend/            # React/TypeScript frontend
+│   ├── src/             # Source code
+│   │   ├── components/  # UI components
+│   │   ├── pages/       # Application pages
+│   │   ├── context/     # React context
+│   │   └── ...
+│   └── ...
+└── package.json         # Project configuration
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+## Installation
 
-**Use your preferred IDE**
+### Backend
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Navigate to the backend directory:
+```
+cd backend
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. Install dependencies:
+```
+npm install
+```
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+3. Start the server in development mode:
+```
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Frontend
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. Navigate to the frontend directory:
+```
+cd <frontend-directory>
+```
 
-**Use GitHub Codespaces**
+2. Install dependencies:
+```
+npm install
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. Start the development server:
+```
+npm run dev
+```
 
-## What technologies are used for this project?
+## Usage
 
-This project is built with:
+1. Access the frontend at http://localhost:5173 (or your configured port)
+2. Login with the default credentials:
+   - Username: `admin`
+   - Password: `admin123`
+3. Configure your Modbus devices in the Configuration page
+4. Connect to devices to start monitoring
 
-- Vite
-- TypeScript
+## API Documentation
+
+The backend provides a comprehensive API for managing flow meters, alarms, reports, and system settings. See `backend/README.md` for details.
+
+## Backend Technology Stack
+
+- Node.js
+- Express.js
+- SQLite (for data storage)
+- modbus-serial (for Modbus communication)
+- WebSocket (for real-time updates)
+
+## Frontend Technology Stack
+
 - React
-- shadcn-ui
+- TypeScript
 - Tailwind CSS
+- shadcn/ui
+- Recharts (for charting)
 
-## How can I deploy this project?
+## License
 
-Simply open [Lovable](https://lovable.dev/projects/3c05b29a-ed2e-40a3-aad2-adffb09a590d) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes it is!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is licensed under the MIT License.
